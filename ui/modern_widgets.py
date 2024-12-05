@@ -22,11 +22,13 @@ class ModernButton(QPushButton):
             }}
             QPushButton:hover {{
                 background-color: {self._adjust_color(color, -20)};
-                transform: translateY(-2px);
+                margin-top: -2px;
+                margin-bottom: 2px;
             }}
             QPushButton:pressed {{
                 background-color: {self._adjust_color(color, -40)};
-                transform: translateY(0px);
+                margin-top: 0px;
+                margin-bottom: 0px;
             }}
             QPushButton:focus {{
                 outline: none;
