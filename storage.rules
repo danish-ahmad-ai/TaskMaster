@@ -1,0 +1,8 @@
+{
+  "rules": {
+    "profile_pictures/{userId}": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.uid == userId"
+    }
+  }
+} 

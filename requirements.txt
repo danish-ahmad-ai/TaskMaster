@@ -1,0 +1,8 @@
+PyQt6==6.6.1
+pyrebase4==4.7.1
+firebase-admin==6.4.0
+requests==2.31.0
+python-dotenv==1.0.0
+pyinstaller==6.3.0
+cryptography==41.0.7
+urllib3==2.1.0 

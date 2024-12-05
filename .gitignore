@@ -1,0 +1,50 @@
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Virtual environment
+venv/
+env/
+.env/
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Firebase config and credentials
+firebase_config.py
+credentials.json
+*.key
+*.pem
+
+# Application specific
+.todoapp/
+*.log
+.session
+
+# System files
+.DS_Store
+Thumbs.db
+
+# PyInstaller
+*.spec
+*.manifest
+*.toc
+
+# Compiled files
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Database files
+*.db
+*.sqlite3 
