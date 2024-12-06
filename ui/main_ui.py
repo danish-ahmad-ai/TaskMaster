@@ -237,37 +237,64 @@ class TaskManager(QWidget):
 
             # Add tab widget with improved styling
             self.tab_widget = QTabWidget()
+            self.tab_widget.setFocusPolicy(Qt.FocusPolicy.NoFocus)  # Disable focus
             self.tab_widget.setStyleSheet("""
                 QTabWidget::pane {
-                    border: 1px solid #e0e0e0;
+                    border: none;
                     border-radius: 10px;
                     background: white;
                     padding: 10px;
+                }
+                QTabWidget::tab-bar {
+                    alignment: left;
+                }
+                QTabBar {
+                    background: transparent;
                 }
                 QTabBar::tab {
                     padding: 10px 20px;
                     margin: 4px 2px;
                     background: #f8f9fa;
-                    border: 1px solid #e0e0e0;
+                    border: none;
                     border-radius: 6px;
                     min-width: 120px;
                     font-size: 13px;
                     color: #4a5568;
+                    outline: none;
+                    text-decoration: none;
                 }
                 QTabBar::tab:selected {
                     background: #4a90e2;
                     color: white;
                     font-weight: bold;
+                    border: none;
+                    outline: none;
                 }
                 QTabBar::tab:hover:!selected {
                     background: #e9ecef;
                     color: #2d3748;
+                }
+                QTabBar::tab:focus {
+                    outline: none;
+                    border: none;
+                }
+                QTabBar::tab:selected:focus {
+                    outline: none;
+                    border: none;
+                }
+                QTabBar QToolButton {
+                    border: none;
+                    outline: none;
                 }
             """)
 
             # Create tabs
             self.active_tab = QWidget()
             self.completed_tab = QWidget()
+            
+            # Set focus policy for the tabs
+            self.active_tab.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            self.completed_tab.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
             # Setup active tab
             active_layout = QVBoxLayout(self.active_tab)
@@ -281,7 +308,7 @@ class TaskManager(QWidget):
             completed_layout.setSpacing(10)
             completed_layout.addWidget(self.completed_table)
 
-            # Add tabs to tab widget
+            # Add tabs to tab widget with icons
             self.tab_widget.addTab(self.active_tab, "Active Tasks 📝")
             self.tab_widget.addTab(self.completed_tab, "Completed Tasks ✅")
             main_layout.addWidget(self.tab_widget)
