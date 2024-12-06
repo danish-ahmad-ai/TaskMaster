@@ -30,6 +30,21 @@ class FadeLabel(QLabel):
         self.opacity.setEasingCurve(QEasingCurve.Type.InOutQuad)
         QTimer.singleShot(100, self.opacity.start)
 
+class PageTitle(QLabel):
+    def __init__(self, text, parent=None):
+        super().__init__(text, parent)
+        self.setFont(QFont("Arial", 24, QFont.Weight.Bold))
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setMinimumHeight(70)  # Ensure enough height for the text
+        self.setStyleSheet("""
+            QLabel {
+                color: #2c3e50;
+                padding: 15px 0;
+                margin: 10px 0;
+                background: transparent;
+            }
+        """)
+
 class LoginWindow(QWidget):
     def __init__(self, app):
         super().__init__()
@@ -85,7 +100,7 @@ class LoginWindow(QWidget):
                 text-decoration: underline;
             }
         """)
-
+        
         # Add developer credit as clickable link
         dev_credit = QLabel()
         dev_credit.setText('<a href="https://danishahmad.xyz" style="color: #0066cc; text-decoration: none;">And by Danish Ahmad</a>')
@@ -100,7 +115,7 @@ class LoginWindow(QWidget):
                 text-decoration: underline;
             }
         """)
-
+        
         title_layout.addWidget(self.welcome_label, 0, Qt.AlignmentFlag.AlignCenter)
         title_layout.addWidget(subtitle, 0, Qt.AlignmentFlag.AlignCenter)
         title_layout.addWidget(dev_credit, 0, Qt.AlignmentFlag.AlignCenter)
@@ -121,13 +136,7 @@ class LoginWindow(QWidget):
         login_widget = QWidget()
         login_layout = QVBoxLayout()
         login_layout.setSpacing(15)
-        
-        # Add login form title
-        login_title = QLabel("Login to Your Account")
-        login_title.setFont(QFont("Arial", 18, QFont.Weight.Bold))
-        login_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        login_title.setStyleSheet("color: #2c3e50; margin: 20px 0;")
-        login_layout.addWidget(login_title)
+        login_layout.setContentsMargins(20, 20, 20, 20)
         
         # Create input fields
         self.login_email = ModernLineEdit()
@@ -199,12 +208,81 @@ class LoginWindow(QWidget):
         
         # Add buttons
         self.login_button = ModernButton("Login")
-        self.guest_button = ModernButton("Continue as Guest ", color="#6c757d")
-        self.signup_button = ModernButton("Need an account? Sign up", color="#28a745")
+        self.login_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                padding: 15px;
+                text-align: center;
+                border-radius: 8px;
+                font-size: 16px;
+                font-weight: bold;
+                min-width: 120px;
+                margin: 2px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+                margin: 0px;
+                border: 2px solid #45a049;
+            }
+            QPushButton:pressed {
+                background-color: #3d8b40;
+                margin: 2px;
+            }
+        """)
+        
+        self.guest_button = ModernButton("Continue as Guest")
+        self.guest_button.setStyleSheet("""
+            QPushButton {
+                background-color: #6c757d;
+                color: white;
+                border: none;
+                padding: 15px;
+                text-align: center;
+                border-radius: 8px;
+                font-size: 16px;
+                font-weight: bold;
+                min-width: 120px;
+                margin: 2px;
+            }
+            QPushButton:hover {
+                background-color: #5a6268;
+                margin: 0px;
+                border: 2px solid #5a6268;
+            }
+            QPushButton:pressed {
+                background-color: #545b62;
+                margin: 2px;
+            }
+        """)
+        
+        self.switch_to_signup_button = ModernButton("Create New Account")
+        self.switch_to_signup_button.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #2196F3;
+                border: 2px solid #2196F3;
+                padding: 12px;
+                text-align: center;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: bold;
+                min-width: 120px;
+            }
+            QPushButton:hover {
+                background-color: #2196F3;
+                color: white;
+            }
+            QPushButton:pressed {
+                background-color: #1976D2;
+                color: white;
+            }
+        """)
         
         login_layout.addWidget(self.login_button)
         login_layout.addWidget(self.guest_button)
-        login_layout.addWidget(self.signup_button)
+        login_layout.addWidget(self.switch_to_signup_button)
         
         # Add stretch at the bottom
         login_layout.addStretch()
@@ -216,17 +294,9 @@ class LoginWindow(QWidget):
         signup_widget = QWidget()
         signup_layout = QVBoxLayout()
         signup_layout.setSpacing(15)
-        
-        # Add signup form title
-        signup_title = QLabel("Create New Account")
-        signup_title.setFont(QFont("Arial", 18, QFont.Weight.Bold))
-        signup_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        signup_title.setStyleSheet("color: #2c3e50; margin: 20px 0;")
-        signup_layout.addWidget(signup_title)
+        signup_layout.setContentsMargins(20, 20, 20, 20)
         
         # Create input fields
-        self.signup_username = ModernLineEdit()
-        self.signup_username.setPlaceholderText("Choose a username")
         self.signup_email = ModernLineEdit()
         self.signup_email.setPlaceholderText("Enter your email address")
         self.signup_password = ModernLineEdit()
@@ -272,17 +342,61 @@ class LoginWindow(QWidget):
         signup_password_layout.addWidget(self.show_signup_password_btn)
         
         # Add fields to layout
-        signup_layout.addWidget(self.signup_username)
         signup_layout.addWidget(self.signup_email)
         signup_layout.addWidget(signup_password_container)
         signup_layout.addWidget(self.signup_confirm_password)
         
         # Add signup button
-        self.create_account_btn = ModernButton("Create Account", color="#28a745")
-        self.back_to_login_btn = ModernButton("Back to Login", color="#6c757d")
+        self.signup_button = ModernButton("Sign Up")
+        self.signup_button.setStyleSheet("""
+            QPushButton {
+                background-color: #2196F3;
+                color: white;
+                border: none;
+                padding: 15px;
+                text-align: center;
+                border-radius: 8px;
+                font-size: 16px;
+                font-weight: bold;
+                min-width: 120px;
+                margin: 2px;
+            }
+            QPushButton:hover {
+                background-color: #1976D2;
+                margin: 0px;
+                border: 2px solid #1976D2;
+            }
+            QPushButton:pressed {
+                background-color: #1565C0;
+                margin: 2px;
+            }
+        """)
         
-        signup_layout.addWidget(self.create_account_btn)
-        signup_layout.addWidget(self.back_to_login_btn)
+        self.switch_to_login_button = ModernButton("Already have an account? Login")
+        self.switch_to_login_button.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #4CAF50;
+                border: 2px solid #4CAF50;
+                padding: 12px;
+                text-align: center;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: bold;
+                min-width: 120px;
+            }
+            QPushButton:hover {
+                background-color: #4CAF50;
+                color: white;
+            }
+            QPushButton:pressed {
+                background-color: #45a049;
+                color: white;
+            }
+        """)
+        
+        signup_layout.addWidget(self.signup_button)
+        signup_layout.addWidget(self.switch_to_login_button)
         
         # Add stretch
         signup_layout.addStretch()
@@ -296,10 +410,10 @@ class LoginWindow(QWidget):
         # Connect buttons
         self.login_button.clicked.connect(self.handle_login)
         self.guest_button.clicked.connect(self.handle_guest_login)
-        self.signup_button.clicked.connect(self.slide_to_signup)
+        self.switch_to_signup_button.clicked.connect(self.slide_to_signup)
+        self.signup_button.clicked.connect(self.handle_signup)
+        self.switch_to_login_button.clicked.connect(self.slide_to_login)
         self.forgot_password_btn.clicked.connect(self.handle_forgot_password)
-        self.create_account_btn.clicked.connect(self.handle_signup)
-        self.back_to_login_btn.clicked.connect(self.slide_to_login)
 
     def handle_guest_login(self):
         """Handle guest login"""
@@ -334,12 +448,11 @@ class LoginWindow(QWidget):
 
     def handle_signup(self):
         """Handle signup attempt"""
-        username = self.signup_username.text().strip()
         email = self.signup_email.text().strip()
         password = self.signup_password.text().strip()
         confirm_password = self.signup_confirm_password.text().strip()
 
-        if not all([username, email, password, confirm_password]):
+        if not all([email, password, confirm_password]):
             show_error(self, "Error", "Please fill in all fields.")
             return
 
@@ -360,7 +473,6 @@ class LoginWindow(QWidget):
             current_user = user
             
             user_data = {
-                'username': username,
                 'email': email,
                 'created_at': datetime.now().isoformat()
             }
@@ -408,7 +520,6 @@ class LoginWindow(QWidget):
         """Clear all input fields"""
         self.login_email.clear()
         self.login_password.clear()
-        self.signup_username.clear()
         self.signup_email.clear()
         self.signup_password.clear()
         self.signup_confirm_password.clear()
