@@ -1,7 +1,9 @@
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem, QMessageBox, QLabel, QHeaderView, QFrame, QCheckBox, QInputDialog, QTabWidget, QCalendarWidget, QComboBox, QDialog, QStyledItemDelegate, QLineEdit, QTextEdit
+    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem, QMessageBox, 
+    QLabel, QHeaderView, QFrame, QCheckBox, QInputDialog, QTabWidget, QCalendarWidget, QComboBox, 
+    QDialog, QStyledItemDelegate, QLineEdit, QTextEdit
 )
-from PyQt6.QtCore import Qt, QTimer, QDate
+from PyQt6.QtCore import Qt, QTimer, QDate, QEvent
 from PyQt6.QtGui import QFont, QColor
 from ui.modern_widgets import ModernButton
 from ui.custom_widgets import show_error, show_success, show_question, show_message
@@ -71,21 +73,77 @@ class DateDelegate(QStyledItemDelegate):
         if index.column() != 1:  # Only for date column
             return None
             
-        calendar = QCalendarWidget(parent)
-        calendar.clicked.connect(calendar.close)
-        return calendar
-        
-    def setEditorData(self, editor, index):
-        try:
-            date_str = index.model().data(index, Qt.ItemDataRole.DisplayRole)
-            date = QDate.fromString(date_str, "yyyy-MM-dd")
-            editor.setSelectedDate(date)
-        except:
-            editor.setSelectedDate(QDate.currentDate())
+    def editorEvent(self, event, model, option, index):
+        if event.type() == QEvent.Type.MouseButtonDblClick:
+            # Create a custom dialog for the calendar
+            dialog = QDialog()
+            dialog.setWindowTitle("Select Due Date")
+            dialog.setStyleSheet("""
+                QDialog {
+                    background-color: white;
+                    border-radius: 10px;
+                    border: 1px solid #e0e0e0;
+                }
+            """)
             
-    def setModelData(self, editor, model, index):
-        date = editor.selectedDate()
-        model.setData(index, date.toString("yyyy-MM-dd"))
+            # Create layout
+            layout = QVBoxLayout(dialog)
+            
+            # Add calendar widget
+            calendar = QCalendarWidget(dialog)
+            calendar.setMinimumDate(QDate.currentDate())
+            calendar.setStyleSheet("""
+                QCalendarWidget {
+                    background-color: white;
+                    border: none;
+                }
+                QCalendarWidget QToolButton {
+                    color: #2d3748;
+                    background-color: transparent;
+                    border: none;
+                    border-radius: 4px;
+                    padding: 4px;
+                }
+                QCalendarWidget QToolButton:hover {
+                    background-color: #e9ecef;
+                }
+                QCalendarWidget QMenu {
+                    background-color: white;
+                    border: 1px solid #e0e0e0;
+                    border-radius: 4px;
+                }
+                QCalendarWidget QSpinBox {
+                    border: 1px solid #e0e0e0;
+                    border-radius: 4px;
+                    padding: 2px;
+                }
+            """)
+            layout.addWidget(calendar)
+            
+            # Add buttons
+            button_layout = QHBoxLayout()
+            ok_button = ModernButton("Select", color="#4a90e2")
+            cancel_button = ModernButton("Cancel", color="#6c757d")
+            
+            ok_button.clicked.connect(dialog.accept)
+            cancel_button.clicked.connect(dialog.reject)
+            
+            button_layout.addWidget(cancel_button)
+            button_layout.addWidget(ok_button)
+            layout.addLayout(button_layout)
+            
+            # Center the dialog on screen
+            screen = QApplication.primaryScreen().geometry()
+            dialog_size = dialog.sizeHint()
+            x = screen.center().x() - dialog_size.width() // 2
+            y = screen.center().y() - dialog_size.height() // 2
+            dialog.move(x, y)
+
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                selected_date = calendar.selectedDate().toString("yyyy-MM-dd")
+                model.setData(index, selected_date)
+                return True
+        return False
 
 class PriorityDelegate(QStyledItemDelegate):
     def createEditor(self, parent, option, index):
@@ -640,7 +698,7 @@ class TaskManager(QWidget):
                 }, token=session['idToken'])
                 
                 # Refresh task list
-                self.refresh_task_list()
+                self.load_initial_tasks()
                 show_success(self, "Success", "Task updated successfully! ✨")
                 
         except Exception as e:
@@ -835,9 +893,12 @@ class TaskManager(QWidget):
             except:
                 pass
                 
-            # For active tasks table
-            self.task_table.setItemDelegateForColumn(1, DateDelegate(self.task_table))
-            self.task_table.setItemDelegateForColumn(2, PriorityDelegate(self.task_table))
+            # For active tasks table only (not completed table)
+            date_delegate = DateDelegate(self.task_table)
+            priority_delegate = PriorityDelegate(self.task_table)
+            
+            self.task_table.setItemDelegateForColumn(1, date_delegate)
+            self.task_table.setItemDelegateForColumn(2, priority_delegate)
             
             # Connect to cell change events - only once
             self.task_table.itemChanged.connect(self.handle_item_change)
