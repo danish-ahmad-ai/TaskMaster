@@ -282,6 +282,12 @@ class LoginWindow(QWidget):
             # Switch to login page
             QTimer.singleShot(1500, self.slide_to_login)
             
+        except requests.exceptions.ConnectionError:
+            print("Network error during signup")
+            show_error(self, "Connection Error", "Unable to connect to the server. Please check your internet connection! ")
+        except requests.exceptions.Timeout:
+            print("Signup request timed out")
+            show_error(self, "Timeout Error", "Request timed out. Please check your internet connection and try again! ")
         except Exception as e:
             error_message = "Failed to create account."
             print(f"Full signup error: {str(e)}")
@@ -289,9 +295,17 @@ class LoginWindow(QWidget):
                 try:
                     error_data = json.loads(e.args[1])
                     if 'error' in error_data:
-                        error_message = error_data['error']['message']
-                        if error_message == 'EMAIL_EXISTS':
-                            error_message = "This email is already registered. Please try logging in instead."
+                        error_code = error_data['error'].get('message', '')
+                        if error_code == 'EMAIL_EXISTS':
+                            error_message = "This email is already registered. Please try logging in instead. "
+                        elif error_code == 'INVALID_EMAIL':
+                            error_message = "Invalid email format. Please check your email address. "
+                        elif error_code == 'WEAK_PASSWORD':
+                            error_message = "Password is too weak. Please use a stronger password with at least 6 characters. "
+                        elif error_code == 'OPERATION_NOT_ALLOWED':
+                            error_message = "Email/password registration is not enabled. Please contact support. "
+                        elif error_code == 'TOO_MANY_ATTEMPTS_TRY_LATER':
+                            error_message = "Too many attempts. Please try again later. "
                 except:
                     pass
             show_error(self, "Error", error_message)
