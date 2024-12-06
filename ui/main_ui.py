@@ -115,164 +115,171 @@ class TaskManager(QWidget):
     """Main task management interface."""
     
     def __init__(self, app: 'ToDoListApp'):
-        super().__init__()
-        self.app = app
-        self.user_id: Optional[str] = None
-        self.firebase_ops = FirebaseOperations(app.session_manager)
-        self.init_ui()
-        
-        # Remove the setup_delegates call from here
-        # We'll call it after UI initialization
+        """Initialize TaskManager."""
+        try:
+            super().__init__()
+            self.app = app
+            self.user_id = None
+            self.firebase_ops = FirebaseOperations(app.session_manager)
+            
+            print("Initializing TaskManager...")
+            self.init_ui()
+            print("TaskManager initialization complete")
+            
+        except Exception as e:
+            print(f"Error in TaskManager initialization: {str(e)}")
+            raise  # Re-raise to see the full traceback
 
     def init_ui(self):
-        self.setWindowTitle("TaskMaster")
-        main_layout = QVBoxLayout()
-        main_layout.setSpacing(20)
-        main_layout.setContentsMargins(20, 20, 20, 20)
+        """Initialize the user interface."""
+        try:
+            self.setWindowTitle("TaskMaster")
+            main_layout = QVBoxLayout()
+            main_layout.setSpacing(20)
+            main_layout.setContentsMargins(20, 20, 20, 20)
 
-        # Top bar with account button and welcome message
-        top_bar = QHBoxLayout()
-        
-        # Welcome message
-        welcome_label = QLabel("My Tasks")
-        welcome_label.setFont(QFont("Arial", 24, QFont.Weight.Bold))
-        welcome_label.setStyleSheet("color: #2c3e50;")
-        
-        # Account button
-        self.account_button = ModernButton("My Account 👤", color="#6c757d")
-        self.account_button.setFixedWidth(150)
-        
-        top_bar.addWidget(welcome_label)
-        top_bar.addStretch()
-        top_bar.addWidget(self.account_button)
-        main_layout.addLayout(top_bar)
+            # Top bar with account button and welcome message
+            top_bar = QHBoxLayout()
+            
+            # Welcome message
+            welcome_label = QLabel("My Tasks")
+            welcome_label.setFont(QFont("Arial", 24, QFont.Weight.Bold))
+            welcome_label.setStyleSheet("color: #2c3e50;")
+            
+            # Account button
+            self.account_button = ModernButton("My Account 👤", color="#6c757d")
+            self.account_button.setFixedWidth(150)
+            
+            top_bar.addWidget(welcome_label)
+            top_bar.addStretch()
+            top_bar.addWidget(self.account_button)
+            main_layout.addLayout(top_bar)
 
-        # Add tab widget with improved styling
-        self.tab_widget = QTabWidget()
-        self.tab_widget.setStyleSheet("""
-            QTabWidget::pane {
-                border: 1px solid #e0e0e0;
-                border-radius: 10px;
-                background: white;
-                padding: 10px;
-            }
-            QTabBar::tab {
-                padding: 10px 20px;
-                margin: 4px 2px;
-                background: #f8f9fa;
-                border: 1px solid #e0e0e0;
-                border-radius: 6px;
-                min-width: 120px;
-                font-size: 13px;
-                color: #4a5568;
-            }
-            QTabBar::tab:selected {
-                background: #4a90e2;
-                color: white;
-                font-weight: bold;
-            }
-            QTabBar::tab:hover:!selected {
-                background: #e9ecef;
-                color: #2d3748;
-            }
-        """)
+            # Create tables first
+            self.task_table = ModernTable()
+            self.completed_table = ModernTable()
 
-        # Create tables first
-        self.task_table = ModernTable()
-        self.completed_table = ModernTable()
+            # Setup tables before adding to layout
+            self.setup_tables()
+            self.setup_delegates()
 
-        # Create tabs first before setting up tables
-        self.active_tab = QWidget()
-        self.completed_tab = QWidget()
+            # Add tab widget with improved styling
+            self.tab_widget = QTabWidget()
+            self.tab_widget.setStyleSheet("""
+                QTabWidget::pane {
+                    border: 1px solid #e0e0e0;
+                    border-radius: 10px;
+                    background: white;
+                    padding: 10px;
+                }
+                QTabBar::tab {
+                    padding: 10px 20px;
+                    margin: 4px 2px;
+                    background: #f8f9fa;
+                    border: 1px solid #e0e0e0;
+                    border-radius: 6px;
+                    min-width: 120px;
+                    font-size: 13px;
+                    color: #4a5568;
+                }
+                QTabBar::tab:selected {
+                    background: #4a90e2;
+                    color: white;
+                    font-weight: bold;
+                }
+                QTabBar::tab:hover:!selected {
+                    background: #e9ecef;
+                    color: #2d3748;
+                }
+            """)
 
-        # Setup active tab
-        active_layout = QVBoxLayout(self.active_tab)
-        active_layout.setContentsMargins(10, 10, 10, 10)
-        active_layout.setSpacing(10)
-        
-        # Add label for active tasks
-        active_label = QLabel("Active Tasks")
-        active_label.setStyleSheet("font-size: 16px; color: #2d3748; margin-bottom: 10px;")
-        active_layout.addWidget(active_label)
+            # Create tabs
+            self.active_tab = QWidget()
+            self.completed_tab = QWidget()
 
-        # Setup completed tab
-        completed_layout = QVBoxLayout(self.completed_tab)
-        completed_layout.setContentsMargins(10, 10, 10, 10)
-        completed_layout.setSpacing(10)
-        
-        # Add label for completed tasks
-        completed_label = QLabel("Completed Tasks")
-        completed_label.setStyleSheet("font-size: 16px; color: #2d3748; margin-bottom: 10px;")
-        completed_layout.addWidget(completed_label)
+            # Setup active tab
+            active_layout = QVBoxLayout(self.active_tab)
+            active_layout.setContentsMargins(10, 10, 10, 10)
+            active_layout.setSpacing(10)
+            active_layout.addWidget(self.task_table)
 
-        # Now setup tables after tabs are created
-        self.setup_tables()
-        
-        # Add tables to their respective layouts
-        active_layout.addWidget(self.task_table)
-        completed_layout.addWidget(self.completed_table)
+            # Setup completed tab
+            completed_layout = QVBoxLayout(self.completed_tab)
+            completed_layout.setContentsMargins(10, 10, 10, 10)
+            completed_layout.setSpacing(10)
+            completed_layout.addWidget(self.completed_table)
 
-        # Add tabs to tab widget
-        self.tab_widget.addTab(self.active_tab, "Active Tasks 📝")
-        self.tab_widget.addTab(self.completed_tab, "Completed Tasks ✅")
-        main_layout.addWidget(self.tab_widget)
+            # Add tabs to tab widget
+            self.tab_widget.addTab(self.active_tab, "Active Tasks 📝")
+            self.tab_widget.addTab(self.completed_tab, "Completed Tasks ✅")
+            main_layout.addWidget(self.tab_widget)
 
-        # Button container
-        button_container = QWidget()
-        button_container.setStyleSheet("""
-            QWidget {
-                background-color: #f8f9fa;
-                border-radius: 10px;
-                padding: 10px;
-            }
-        """)
-        button_layout = QHBoxLayout(button_container)
-        button_layout.setSpacing(10)
-        button_layout.setContentsMargins(10, 5, 10, 5)
+            # Button container
+            button_container = QWidget()
+            button_container.setStyleSheet("""
+                QWidget {
+                    background-color: #f8f9fa;
+                    border-radius: 10px;
+                    padding: 10px;
+                }
+            """)
+            button_layout = QHBoxLayout(button_container)
+            button_layout.setSpacing(10)
+            button_layout.setContentsMargins(10, 5, 10, 5)
 
-        # Action buttons (removed delete button)
-        self.add_task_button = ModernButton("Add Task ➕", color="#28a745")
-        self.update_task_button = ModernButton("Update Task 📝", color="#ffc107")
-        self.toggle_task_button = ModernButton("Complete Task ✓", color="#4a90e2")
-        self.logout_button = ModernButton("Logout 👋", color="#6c757d")
+            # Action buttons
+            self.add_task_button = ModernButton("Add Task ➕", color="#28a745")
+            self.update_task_button = ModernButton("Update Task 📝", color="#ffc107")
+            self.toggle_task_button = ModernButton("Complete Task ✓", color="#4a90e2")
+            self.logout_button = ModernButton("Logout 👋", color="#6c757d")
 
-        # Add buttons
-        for button in [self.add_task_button, self.update_task_button, 
-                      self.toggle_task_button, self.logout_button]:
-            button_layout.addWidget(button)
-            button.setMinimumWidth(120)
+            # Add buttons
+            for button in [self.add_task_button, self.update_task_button, 
+                          self.toggle_task_button, self.logout_button]:
+                button_layout.addWidget(button)
+                button.setMinimumWidth(120)
 
-        main_layout.addWidget(button_container)
-        self.setLayout(main_layout)
+            main_layout.addWidget(button_container)
+            self.setLayout(main_layout)
 
-        # Connect signals
-        self.add_task_button.clicked.connect(self.add_task)
-        self.update_task_button.clicked.connect(self.update_task)
-        self.toggle_task_button.clicked.connect(self.toggle_task_completion)
-        self.logout_button.clicked.connect(self.logout)
-        self.account_button.clicked.connect(self.show_account)
+            # Connect signals
+            self.add_task_button.clicked.connect(self.add_task)
+            self.update_task_button.clicked.connect(self.update_task)
+            self.toggle_task_button.clicked.connect(self.toggle_task_completion)
+            self.logout_button.clicked.connect(self.logout)
+            self.account_button.clicked.connect(self.show_account)
+
+            print("UI initialization completed successfully")
+
+        except Exception as e:
+            print(f"Error initializing UI: {str(e)}")
+            raise  # Re-raise the exception to see the full traceback
 
     def set_user_id(self, user_id):
         """Set the current user ID and refresh the task list."""
-        print(f"Setting user ID to: {user_id}")
-        self.user_id = user_id
-        if user_id:
-            # Use QTimer to ensure UI is ready
-            QTimer.singleShot(500, self.refresh_task_list)  # Increased delay
-
-    def refresh_task_list(self):
-        """Load tasks from Firebase and display them in appropriate tables."""
         try:
+            print(f"Setting user ID to: {user_id}")
+            self.user_id = user_id
+            if user_id:
+                # Load tasks silently without showing alerts
+                self.load_initial_tasks()
+                
+        except Exception as e:
+            print(f"Error in set_user_id: {str(e)}")
+
+    def load_initial_tasks(self):
+        """Load initial tasks without showing alerts"""
+        try:
+            print("Loading initial tasks...")
+            
+            # Clear existing rows first
             self.task_table.setRowCount(0)
             self.completed_table.setRowCount(0)
             
-            if not self.user_id:
-                self.show_empty_state(self.task_table, "Please log in to see your tasks")
-                self.show_empty_state(self.completed_table, "Please log in to see your tasks")
-                return
-            
+            # Get session
             session = self.app.session_manager.load_session()
             if not session or not session.get('idToken'):
+                print("No valid session found")
                 return
             
             # Get tasks from Firebase
@@ -282,49 +289,84 @@ class TaskManager(QWidget):
             completed_row = 0
             
             if tasks and tasks.each():
+                # Temporarily disconnect itemChanged signal to prevent triggering updates
+                self.task_table.blockSignals(True)
+                self.completed_table.blockSignals(True)
+                
                 for task in tasks.each():
                     task_data = task.val()
                     if task_data:
-                        # Determine which table to use
                         is_completed = task_data.get('completed', False)
                         target_table = self.completed_table if is_completed else self.task_table
                         current_row = completed_row if is_completed else active_row
                         
-                        # Insert new row
+                        # Insert row
                         target_table.insertRow(current_row)
                         
                         # Create items
-                        name = task_data.get('task_name', '')
-                        due_date = task_data.get('due_date', 'N/A')
-                        priority = task_data.get('priority', 'Low')
+                        name_item = QTableWidgetItem(task_data.get('task_name', ''))
+                        date_item = QTableWidgetItem(task_data.get('due_date', 'N/A'))
+                        priority_item = QTableWidgetItem(task_data.get('priority', 'Low'))
                         
-                        # Create table items
-                        task_name_item = QTableWidgetItem(name)
-                        due_date_item = QTableWidgetItem(due_date)
-                        priority_item = QTableWidgetItem(priority)
+                        # Store task key
+                        name_item.setData(Qt.ItemDataRole.UserRole, task.key())
                         
-                        # Store task key in first column
-                        task_name_item.setData(Qt.ItemDataRole.UserRole, task.key())
-                        
-                        # Set items in table
-                        target_table.setItem(current_row, 0, task_name_item)
-                        target_table.setItem(current_row, 1, due_date_item)
+                        # Set items
+                        target_table.setItem(current_row, 0, name_item)
+                        target_table.setItem(current_row, 1, date_item)
                         target_table.setItem(current_row, 2, priority_item)
                         
-                        # Update row counter
+                        # Update counters
                         if is_completed:
                             completed_row += 1
                         else:
                             active_row += 1
+                
+                # Re-enable signals
+                self.task_table.blockSignals(False)
+                self.completed_table.blockSignals(False)
             
-            # Show empty state if no tasks
-            if self.task_table.rowCount() == 0:
+            # Show empty states if needed
+            if active_row == 0:
                 self.show_empty_state(self.task_table, "No active tasks")
-            if self.completed_table.rowCount() == 0:
+            if completed_row == 0:
                 self.show_empty_state(self.completed_table, "No completed tasks")
+            
+            print(f"Successfully loaded {active_row} active and {completed_row} completed tasks")
+            
+        except Exception as e:
+            print(f"Error loading initial tasks: {str(e)}")
+            self.show_empty_state(self.task_table, "Error loading tasks")
+            self.show_empty_state(self.completed_table, "Error loading tasks")
+
+    def setup_tables(self):
+        """Setup both tables with their configurations"""
+        try:
+            for table in [self.task_table, self.completed_table]:
+                # Basic setup
+                table.setColumnCount(3)
+                table.setHorizontalHeaderLabels(["Task Name", "Due Date", "Priority"])
+                
+                # Column sizes
+                header = table.horizontalHeader()
+                header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+                header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
+                header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+                table.setColumnWidth(1, 120)
+                table.setColumnWidth(2, 120)
+                
+                # Hide vertical header
+                table.verticalHeader().setVisible(False)
+                
+                # Selection behavior
+                table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+                table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+                
+                # Set initial empty state
+                self.show_empty_state(table)
                 
         except Exception as e:
-            print(f"Error refreshing task list: {e}")
+            print(f"Error setting up tables: {str(e)}")
 
     def sanitize_input(self, text: str) -> str:
         """Sanitize user input."""
@@ -360,21 +402,21 @@ class TaskManager(QWidget):
 
             # Task name input with character counter
             layout.addWidget(QLabel("Task Name:"))
-            task_input = QLineEdit()  # Using QLineEdit instead of QTextEdit
-            task_input.setMaxLength(50)  # Set maximum character limit
+            task_input = QLineEdit()
+            task_input.setMaxLength(50)
             task_input.setStyleSheet("""
                 QLineEdit {
                     padding: 8px;
                     border: 1px solid #e0e0e0;
                     border-radius: 6px;
-                    background-color: #f8f9fa;  /* Light gray background */
-                    color: #2d3748;  /* Dark text color */
+                    background-color: #f8f9fa;
+                    color: #2d3748;
                     font-size: 13px;
                     min-height: 30px;
                 }
                 QLineEdit:focus {
                     border: 1px solid #4a90e2;
-                    background-color: white;  /* White background when focused */
+                    background-color: white;
                 }
             """)
 
@@ -382,7 +424,6 @@ class TaskManager(QWidget):
             char_counter = QLabel("50 characters remaining")
             char_counter.setStyleSheet("color: #666; font-size: 11px;")
             
-            # Update character counter as user types
             def update_counter():
                 remaining = 50 - len(task_input.text())
                 char_counter.setText(f"{remaining} characters remaining")
@@ -454,12 +495,17 @@ class TaskManager(QWidget):
                     'updated_at': datetime.now().isoformat()
                 }
 
-                # Add to Firebase
-                db.child('tasks').child(self.user_id).push(task_data, token=session['idToken'])
+                try:
+                    # Add to Firebase
+                    db.child('tasks').child(self.user_id).push(task_data, token=session['idToken'])
 
-                # Refresh task list
-                self.refresh_task_list()
-                show_success(self, "Success", "Task added successfully! ✨")
+                    # Refresh task list using load_initial_tasks instead of safe_refresh_task_list
+                    self.load_initial_tasks()
+                    show_success(self, "Success", "Task added successfully! ✨")
+                    
+                except Exception as e:
+                    print(f"Error saving task to Firebase: {str(e)}")
+                    show_error(self, "Error", "Failed to save task. Please try again!")
 
         except Exception as e:
             print(f"Error adding task: {str(e)}")
@@ -762,24 +808,6 @@ class TaskManager(QWidget):
             print(f"Error in refresh_token: {str(e)}")
             return None
 
-    def setup_tables(self):
-        """Setup both tables with their configurations"""
-        # Setup active tasks table
-        self.setup_table(self.task_table)
-        
-        # Disable all editing in tables
-        self.task_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.completed_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        
-        # Remove the double-click connection if it exists
-        try:
-            self.task_table.itemDoubleClicked.disconnect()
-        except:
-            pass
-        
-        # Connect double-click to update_task instead
-        self.task_table.itemDoubleClicked.connect(lambda _: self.update_task())
-
     def setup_delegates(self):
         """Set up delegates for table columns"""
         try:
@@ -843,18 +871,22 @@ class TaskManager(QWidget):
                         'priority_value': PriorityLevel.get_priority_value(new_value),
                         'updated_at': datetime.now().isoformat()
                     }, token=session['idToken'])
-                    self.sort_tasks_by_priority()
                     
-                show_success(self, "Success", "Task updated successfully! ✨")
+                # Reload tasks silently
+                self.load_initial_tasks()
+                
+            except Exception as e:
+                print(f"Error updating task: {e}")
+                show_error(self, "Error", "Failed to update task")
+                self.load_initial_tasks()  # Refresh to revert changes
                 
             finally:
                 # Always unblock signals
                 self.task_table.blockSignals(False)
                 
         except Exception as e:
-            print(f"Error updating task: {e}")
-            show_error(self, "Error", "Failed to update task")
-            self.refresh_task_list()  # Refresh to revert changes
+            print(f"Error in handle_item_change: {e}")
+            self.load_initial_tasks()  # Refresh to revert changes
 
     def setup_table(self, table):
         """Setup table columns and formatting"""
@@ -862,45 +894,45 @@ class TaskManager(QWidget):
         table.setHorizontalHeaderLabels(["Task Name", "Due Date", "Priority"])
         
         # Set column sizes
-        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
-        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        header = table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
         table.setColumnWidth(1, 120)
         table.setColumnWidth(2, 120)
         
         # Set row height
         table.verticalHeader().setDefaultSectionSize(45)
+        table.verticalHeader().setVisible(False)  # Hide row numbers
         
         # Additional styling
-        table.setStyleSheet(table.styleSheet() + """
+        table.setStyleSheet("""
             QTableWidget {
                 gridline-color: #f0f0f0;
+                background-color: white;
+                border: 1px solid #e0e0e0;
+                border-radius: 10px;
+                padding: 5px;
             }
             QTableWidget::item {
                 padding: 8px;
                 border-bottom: 1px solid #edf2f7;
-                white-space: normal;
+            }
+            QHeaderView::section {
+                background-color: #f8f9fa;
+                padding: 8px;
+                border: none;
+                font-weight: bold;
+                color: #2d3748;
             }
         """)
 
-        # Add info label for completed tasks tab if this is the completed table
-        if table == self.completed_table:
-            info_label = QLabel("✨ Completed tasks are automatically deleted after 20 days")
-            info_label.setStyleSheet("""
-                QLabel {
-                    color: #666;
-                    font-size: 12px;
-                    font-style: italic;
-                    padding: 5px;
-                    background: #f8f9fa;
-                    border-radius: 4px;
-                    margin-top: 5px;
-                }
-            """)
-            info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            
-            # Add the label to the completed tab layout
-            self.completed_tab.layout().addWidget(info_label)
+        # Enable alternating row colors
+        table.setAlternatingRowColors(True)
+        
+        # Enable selection of entire rows
+        table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
 
     def show_empty_state(self, table, message="No tasks found"):
         """Show empty state message in table"""
