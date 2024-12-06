@@ -51,10 +51,37 @@ class LoginWindow(QWidget):
         main_layout = QVBoxLayout()
         
         # Add welcome message with fade animation
-        self.welcome_label = FadeLabel("Welcome to TaskMaster ")
-        self.welcome_label.setFont(QFont("Arial", 24, QFont.Weight.Bold))
-        self.welcome_label.setStyleSheet("color: #2c3e50; margin: 20px;")
-        main_layout.addWidget(self.welcome_label)
+        title_container = QWidget()
+        title_layout = QVBoxLayout(title_container)
+        title_layout.setSpacing(5)
+        title_layout.setContentsMargins(0, 0, 0, 20)
+
+        self.welcome_label = FadeLabel("TaskMaster")
+        self.welcome_label.setFont(QFont("Arial", 42, QFont.Weight.ExtraBold))
+        self.welcome_label.setStyleSheet("""
+            color: #2c3e50;
+            margin: 10px;
+            letter-spacing: 2px;
+        """)
+        
+        # Add shadow effect to welcome label
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(4)
+        shadow.setColor(QColor(0, 0, 0, 50))
+        shadow.setOffset(2, 2)
+        self.welcome_label.setGraphicsEffect(shadow)
+
+        subtitle = QLabel("by D-Tech Solutions")
+        subtitle.setFont(QFont("Arial", 14, QFont.Weight.Medium))
+        subtitle.setStyleSheet("""
+            color: #34495e;
+            margin-bottom: 10px;
+            letter-spacing: 1px;
+        """)
+
+        title_layout.addWidget(self.welcome_label, 0, Qt.AlignmentFlag.AlignCenter)
+        title_layout.addWidget(subtitle, 0, Qt.AlignmentFlag.AlignCenter)
+        main_layout.addWidget(title_container)
         
         # Create stacked widget with sliding animation
         self.stacked_widget = QStackedWidget()
@@ -79,8 +106,10 @@ class LoginWindow(QWidget):
         login_layout.addWidget(login_title)
         
         # Create input fields
-        self.login_email = ModernLineEdit(placeholder="Enter your email")
-        self.login_password = ModernLineEdit(placeholder="Enter your password")
+        self.login_email = ModernLineEdit()
+        self.login_email.setPlaceholderText("Enter your email address")
+        self.login_password = ModernLineEdit()
+        self.login_password.setPlaceholderText("Enter your password")
         self.login_password.setEchoMode(QLineEdit.EchoMode.Password)
         
         # Create password container with visibility toggle
@@ -93,8 +122,28 @@ class LoginWindow(QWidget):
         password_layout.addWidget(self.login_password)
         
         # Add show/hide password button
-        self.show_password_btn = ModernButton("", color="#6c757d")
-        self.show_password_btn.setFixedWidth(50)
+        self.show_password_btn = ModernButton("👁️", color="#6c757d")
+        self.show_password_btn.setFixedSize(40, 40)  # Fixed size
+        self.show_password_btn.setStyleSheet("""
+            QPushButton {
+                padding: 8px;
+                border: none;
+                border-radius: 6px;
+                background-color: #6c757d;
+                color: white;
+                font-size: 16px;
+                min-width: 40px;
+                max-width: 40px;
+                min-height: 40px;
+                max-height: 40px;
+            }
+            QPushButton:hover {
+                background-color: #5a6268;
+            }
+            QPushButton:pressed {
+                background-color: #545b62;
+            }
+        """)
         self.show_password_btn.setCheckable(True)
         self.show_password_btn.clicked.connect(self.toggle_password_visibility)
         password_layout.addWidget(self.show_password_btn)
@@ -156,12 +205,15 @@ class LoginWindow(QWidget):
         signup_layout.addWidget(signup_title)
         
         # Create input fields
-        self.signup_username = ModernLineEdit(placeholder="Choose a username")
-        self.signup_email = ModernLineEdit(placeholder="Enter your email")
-        self.signup_password = ModernLineEdit(placeholder="Choose a password")
-        self.signup_confirm_password = ModernLineEdit(placeholder="Confirm your password")
-        
+        self.signup_username = ModernLineEdit()
+        self.signup_username.setPlaceholderText("Choose a username")
+        self.signup_email = ModernLineEdit()
+        self.signup_email.setPlaceholderText("Enter your email address")
+        self.signup_password = ModernLineEdit()
+        self.signup_password.setPlaceholderText("Create a password (min. 6 characters)")
         self.signup_password.setEchoMode(QLineEdit.EchoMode.Password)
+        self.signup_confirm_password = ModernLineEdit()
+        self.signup_confirm_password.setPlaceholderText("Confirm your password")
         self.signup_confirm_password.setEchoMode(QLineEdit.EchoMode.Password)
         
         # Add password visibility toggle for signup
@@ -171,8 +223,28 @@ class LoginWindow(QWidget):
         signup_password_layout.setSpacing(10)
         
         signup_password_layout.addWidget(self.signup_password)
-        self.show_signup_password_btn = ModernButton("", color="#6c757d")
-        self.show_signup_password_btn.setFixedWidth(50)
+        self.show_signup_password_btn = ModernButton("👁️", color="#6c757d")
+        self.show_signup_password_btn.setFixedSize(40, 40)  # Fixed size
+        self.show_signup_password_btn.setStyleSheet("""
+            QPushButton {
+                padding: 8px;
+                border: none;
+                border-radius: 6px;
+                background-color: #6c757d;
+                color: white;
+                font-size: 16px;
+                min-width: 40px;
+                max-width: 40px;
+                min-height: 40px;
+                max-height: 40px;
+            }
+            QPushButton:hover {
+                background-color: #5a6268;
+            }
+            QPushButton:pressed {
+                background-color: #545b62;
+            }
+        """)
         self.show_signup_password_btn.setCheckable(True)
         self.show_signup_password_btn.clicked.connect(self.toggle_signup_password_visibility)
         signup_password_layout.addWidget(self.show_signup_password_btn)
@@ -424,10 +496,13 @@ class LoginWindow(QWidget):
         """Toggle password visibility"""
         if self.show_password_btn.isChecked():
             self.login_password.setEchoMode(QLineEdit.EchoMode.Normal)
-            self.show_password_btn.setText("")
+            self.show_password_btn.setText("🔒")
         else:
             self.login_password.setEchoMode(QLineEdit.EchoMode.Password)
-            self.show_password_btn.setText("")
+            self.show_password_btn.setText("👁️")
+        # Prevent focus and layout shifts
+        self.show_password_btn.clearFocus()
+        self.show_password_btn.updateGeometry()
 
     def handle_forgot_password(self):
         """Handle forgot password request"""
@@ -451,11 +526,14 @@ class LoginWindow(QWidget):
         if self.show_signup_password_btn.isChecked():
             self.signup_password.setEchoMode(QLineEdit.EchoMode.Normal)
             self.signup_confirm_password.setEchoMode(QLineEdit.EchoMode.Normal)
-            self.show_signup_password_btn.setText("")
+            self.show_signup_password_btn.setText("🔒")
         else:
             self.signup_password.setEchoMode(QLineEdit.EchoMode.Password)
             self.signup_confirm_password.setEchoMode(QLineEdit.EchoMode.Password)
-            self.show_signup_password_btn.setText("")
+            self.show_signup_password_btn.setText("👁️")
+        # Prevent focus and layout shifts
+        self.show_signup_password_btn.clearFocus()
+        self.show_signup_password_btn.updateGeometry()
 
     def slide_to_login(self):
         """Animate transition to login page"""
