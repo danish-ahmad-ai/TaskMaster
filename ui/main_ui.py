@@ -339,46 +339,131 @@ class TaskManager(QWidget):
         
     def add_task(self):
         """Add a new task with date picker and priority"""
-        # Create a custom dialog for task input
-        dialog = QDialog(self)
-        dialog.setWindowTitle("Add Task")
-        layout = QVBoxLayout(dialog)
+        try:
+            # Create a custom dialog for task input
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Add Task")
+            layout = QVBoxLayout(dialog)
 
-        # Task name input with character counter
-        layout.addWidget(QLabel("Task Name:"))
-        task_input = QLineEdit()  # Using QLineEdit instead of QTextEdit
-        task_input.setMaxLength(50)  # Set maximum character limit
-        task_input.setStyleSheet("""
-            QLineEdit {
-                padding: 8px;
-                border: 1px solid #e0e0e0;
-                border-radius: 6px;
-                background-color: white;
-                font-size: 13px;
-                min-height: 30px;
-            }
-            QLineEdit:focus {
-                border: 1px solid #4a90e2;
-            }
-        """)
+            # Add title with styling
+            title_label = QLabel("Add New Task ✨")
+            title_label.setStyleSheet("""
+                QLabel {
+                    color: #2c3e50;
+                    font-size: 18px;
+                    font-weight: bold;
+                    padding: 10px 0;
+                }
+            """)
+            title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            layout.addWidget(title_label)
 
-        # Add character counter label
-        char_counter = QLabel("50 characters remaining")
-        char_counter.setStyleSheet("color: #666; font-size: 11px;")
-        
-        # Update character counter as user types
-        def update_counter():
-            remaining = 50 - len(task_input.text())
-            char_counter.setText(f"{remaining} characters remaining")
-            if remaining < 10:
-                char_counter.setStyleSheet("color: #dc3545; font-size: 11px;")
-            else:
-                char_counter.setStyleSheet("color: #666; font-size: 11px;")
+            # Task name input with character counter
+            layout.addWidget(QLabel("Task Name:"))
+            task_input = QLineEdit()  # Using QLineEdit instead of QTextEdit
+            task_input.setMaxLength(50)  # Set maximum character limit
+            task_input.setStyleSheet("""
+                QLineEdit {
+                    padding: 8px;
+                    border: 1px solid #e0e0e0;
+                    border-radius: 6px;
+                    background-color: #f8f9fa;  /* Light gray background */
+                    color: #2d3748;  /* Dark text color */
+                    font-size: 13px;
+                    min-height: 30px;
+                }
+                QLineEdit:focus {
+                    border: 1px solid #4a90e2;
+                    background-color: white;  /* White background when focused */
+                }
+            """)
 
-        task_input.textChanged.connect(update_counter)
-        
-        layout.addWidget(task_input)
-        layout.addWidget(char_counter)
+            # Add character counter label
+            char_counter = QLabel("50 characters remaining")
+            char_counter.setStyleSheet("color: #666; font-size: 11px;")
+            
+            # Update character counter as user types
+            def update_counter():
+                remaining = 50 - len(task_input.text())
+                char_counter.setText(f"{remaining} characters remaining")
+                if remaining < 10:
+                    char_counter.setStyleSheet("color: #dc3545; font-size: 11px;")
+                else:
+                    char_counter.setStyleSheet("color: #666; font-size: 11px;")
+
+            task_input.textChanged.connect(update_counter)
+            
+            layout.addWidget(task_input)
+            layout.addWidget(char_counter)
+
+            # Add date picker
+            layout.addWidget(QLabel("Due Date:"))
+            date_picker = QCalendarWidget()
+            date_picker.setMinimumDate(QDate.currentDate())
+            layout.addWidget(date_picker)
+
+            # Add priority selector
+            layout.addWidget(QLabel("Priority:"))
+            priority_combo = QComboBox()
+            priority_combo.addItems([
+                PriorityLevel.URGENT,
+                PriorityLevel.HIGH,
+                PriorityLevel.MEDIUM,
+                PriorityLevel.LOW
+            ])
+            layout.addWidget(priority_combo)
+
+            # Add buttons
+            button_layout = QHBoxLayout()
+            add_button = ModernButton("Add Task")
+            cancel_button = ModernButton("Cancel", color="#6c757d")
+            
+            button_layout.addWidget(cancel_button)
+            button_layout.addWidget(add_button)
+            
+            layout.addLayout(button_layout)
+
+            # Connect buttons
+            add_button.clicked.connect(dialog.accept)
+            cancel_button.clicked.connect(dialog.reject)
+
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                # Get values
+                task_name = task_input.text().strip()
+                due_date = date_picker.selectedDate().toString("yyyy-MM-dd")
+                priority = priority_combo.currentText()
+
+                if not task_name:
+                    show_error(self, "Error", "Please enter a task name!")
+                    return
+
+                # Get session
+                session = self.app.session_manager.load_session()
+                if not session or not session.get('idToken'):
+                    show_error(self, "Error", "Please log in to add tasks!")
+                    return
+
+                # Create task data
+                task_data = {
+                    'task_name': self.sanitize_input(task_name),
+                    'due_date': due_date,
+                    'priority': priority,
+                    'priority_value': PriorityLevel.get_priority_value(priority),
+                    'completed': False,
+                    'created_at': datetime.now().isoformat(),
+                    'updated_at': datetime.now().isoformat()
+                }
+
+                # Add to Firebase
+                db.child('tasks').child(self.user_id).push(task_data, token=session['idToken'])
+
+                # Refresh task list
+                self.refresh_task_list()
+                show_success(self, "Success", "Task added successfully! ✨")
+
+        except Exception as e:
+            print(f"Error adding task: {str(e)}")
+            show_error(self, "Error", "Failed to add task. Please try again! 😅")
 
     def update_task(self):
         """Update selected task"""
