@@ -289,7 +289,7 @@ class TaskManager(QWidget):
             completed_row = 0
             
             if tasks and tasks.each():
-                # Temporarily disconnect itemChanged signal to prevent triggering updates
+                # Temporarily disconnect itemChanged signal
                 self.task_table.blockSignals(True)
                 self.completed_table.blockSignals(True)
                 
@@ -310,6 +310,24 @@ class TaskManager(QWidget):
                         
                         # Store task key
                         name_item.setData(Qt.ItemDataRole.UserRole, task.key())
+                        
+                        # If task is completed, make items uneditable and add strikethrough
+                        if is_completed:
+                            font = name_item.font()
+                            font.setStrikeOut(True)
+                            name_item.setFont(font)
+                            date_item.setFont(font)
+                            priority_item.setFont(font)
+                            
+                            # Make items uneditable
+                            name_item.setFlags(name_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                            date_item.setFlags(date_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                            priority_item.setFlags(priority_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                            
+                            # Add completed styling
+                            name_item.setForeground(QColor("#9CA3AF"))
+                            date_item.setForeground(QColor("#9CA3AF"))
+                            priority_item.setForeground(QColor("#9CA3AF"))
                         
                         # Set items
                         target_table.setItem(current_row, 0, name_item)
@@ -732,7 +750,7 @@ class TaskManager(QWidget):
             self.tab_widget.setCurrentWidget(self.completed_tab)
             
             # Refresh tables
-            self.refresh_task_list()
+            self.load_initial_tasks()
             
             # Show success message
             show_success(self, "Success", "Task marked as completed! 🎉")
