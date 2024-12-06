@@ -339,78 +339,46 @@ class TaskManager(QWidget):
         
     def add_task(self):
         """Add a new task with date picker and priority"""
-        task_name, ok = QInputDialog.getText(self, "Add Task", "Task Name:")
-        if ok and task_name:
-            try:
-                # Sanitize input
-                task_name = self.sanitize_input(task_name)
-                
-                # Show date picker
-                date_dialog = DatePickerDialog(self)
-                if date_dialog.exec() == QDialog.DialogCode.Accepted:
-                    due_date = date_dialog.calendar.selectedDate().toString("yyyy-MM-dd")
-                else:
-                    return
-                    
-                # Show priority selector
-                priority_dialog = QDialog(self)
-                priority_dialog.setWindowTitle("Select Priority")
-                layout = QVBoxLayout(priority_dialog)
-                
-                priority_combo = QComboBox()
-                priority_combo.addItems([
-                    PriorityLevel.URGENT,
-                    PriorityLevel.HIGH,
-                    PriorityLevel.MEDIUM,
-                    PriorityLevel.LOW
-                ])
-                layout.addWidget(priority_combo)
-                
-                select_button = ModernButton("Select")
-                select_button.clicked.connect(priority_dialog.accept)
-                layout.addWidget(select_button)
-                
-                if priority_dialog.exec() != QDialog.DialogCode.Accepted:
-                    return
-                    
-                priority = priority_combo.currentText()
-                
-                # Get session data and check authentication
-                session = self.app.session_manager.load_session()
-                if not session:
-                    show_error(self, "Error", "Please log in to add tasks! 🔑")
-                    return
-                    
-                if session.get('is_guest'):
-                    show_error(self, "Guest Mode", "Please create an account to add tasks! ")
-                    return
-                    
-                token = session.get('idToken')
-                if not token:
-                    show_error(self, "Error", "Session expired. Please log in again! 🔑")
-                    self.app.switch_to_login()
-                    return
-                    
-                task_data = {
-                    'task_name': task_name,
-                    'due_date': due_date,
-                    'priority': priority,
-                    'priority_value': PriorityLevel.get_priority_value(priority),
-                    'created_at': datetime.now().isoformat(),
-                    'completed': False
-                }
-                
-                # Add task to Firebase
-                db.child('tasks').child(self.user_id).push(task_data, token=token)
-                
-                # Refresh and sort the list
-                self.refresh_task_list()
-                
-                show_success(self, "Success", "Task added successfully! ✨")
-                
-            except Exception as e:
-                print(f"Error adding task: {str(e)}")
-                self.handle_error(e)
+        # Create a custom dialog for task input
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Add Task")
+        layout = QVBoxLayout(dialog)
+
+        # Task name input with character counter
+        layout.addWidget(QLabel("Task Name:"))
+        task_input = QLineEdit()  # Using QLineEdit instead of QTextEdit
+        task_input.setMaxLength(50)  # Set maximum character limit
+        task_input.setStyleSheet("""
+            QLineEdit {
+                padding: 8px;
+                border: 1px solid #e0e0e0;
+                border-radius: 6px;
+                background-color: white;
+                font-size: 13px;
+                min-height: 30px;
+            }
+            QLineEdit:focus {
+                border: 1px solid #4a90e2;
+            }
+        """)
+
+        # Add character counter label
+        char_counter = QLabel("50 characters remaining")
+        char_counter.setStyleSheet("color: #666; font-size: 11px;")
+        
+        # Update character counter as user types
+        def update_counter():
+            remaining = 50 - len(task_input.text())
+            char_counter.setText(f"{remaining} characters remaining")
+            if remaining < 10:
+                char_counter.setStyleSheet("color: #dc3545; font-size: 11px;")
+            else:
+                char_counter.setStyleSheet("color: #666; font-size: 11px;")
+
+        task_input.textChanged.connect(update_counter)
+        
+        layout.addWidget(task_input)
+        layout.addWidget(char_counter)
 
     def update_task(self):
         """Update selected task"""
@@ -431,27 +399,45 @@ class TaskManager(QWidget):
             # Create update dialog
             update_dialog = QDialog(self)
             update_dialog.setWindowTitle("Update Task")
-            update_dialog.setMinimumWidth(400)  # Set minimum width
+            update_dialog.setMinimumWidth(400)
             layout = QVBoxLayout(update_dialog)
             
-            # Task name input - using QTextEdit instead of QLineEdit
+            # Task name input with character limit
             layout.addWidget(QLabel("Task Name:"))
-            name_input = QTextEdit()
-            name_input.setPlainText(current_name)
-            name_input.setMinimumHeight(100)  # Increased height for text field
-            name_input.setMaximumHeight(150)  # Set maximum height
-            name_input.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+            name_input = QLineEdit()
+            name_input.setText(current_name)
+            name_input.setMaxLength(50)
             name_input.setStyleSheet("""
-                QTextEdit {
+                QLineEdit {
                     padding: 8px;
                     border: 1px solid #e0e0e0;
                     border-radius: 6px;
                     background-color: white;
                     font-size: 13px;
-                    color: #2d3748;  # Dark text color
+                    min-height: 30px;
+                    color: #2d3748;
+                }
+                QLineEdit:focus {
+                    border: 1px solid #4a90e2;
                 }
             """)
+
+            # Add character counter
+            char_counter = QLabel(f"{50 - len(current_name)} characters remaining")
+            char_counter.setStyleSheet("color: #666; font-size: 11px;")
+            
+            def update_counter():
+                remaining = 50 - len(name_input.text())
+                char_counter.setText(f"{remaining} characters remaining")
+                if remaining < 10:
+                    char_counter.setStyleSheet("color: #dc3545; font-size: 11px;")
+                else:
+                    char_counter.setStyleSheet("color: #666; font-size: 11px;")
+
+            name_input.textChanged.connect(update_counter)
+            
             layout.addWidget(name_input)
+            layout.addWidget(char_counter)
             
             # Date picker
             layout.addWidget(QLabel("Due Date:"))
@@ -491,7 +477,7 @@ class TaskManager(QWidget):
                     return
                     
                 # Get new values
-                new_name = name_input.toPlainText().strip()
+                new_name = name_input.text().strip()
                 new_date = date_picker.selectedDate().toString("yyyy-MM-dd")
                 new_priority = priority_combo.currentText()
                 
@@ -696,13 +682,18 @@ class TaskManager(QWidget):
         # Setup active tasks table
         self.setup_table(self.task_table)
         
-        # Allow double-click editing for task name column only
-        self.task_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)  # First make all columns read-only
-        self.task_table.itemDoubleClicked.connect(self.handle_item_double_click)
-        
-        # Setup completed tasks table
-        self.setup_table(self.completed_table)
+        # Disable all editing in tables
+        self.task_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.completed_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        
+        # Remove the double-click connection if it exists
+        try:
+            self.task_table.itemDoubleClicked.disconnect()
+        except:
+            pass
+        
+        # Connect double-click to update_task instead
+        self.task_table.itemDoubleClicked.connect(lambda _: self.update_task())
 
     def setup_delegates(self):
         """Set up delegates for table columns"""
@@ -792,10 +783,8 @@ class TaskManager(QWidget):
         table.setColumnWidth(1, 120)
         table.setColumnWidth(2, 120)
         
-        # Enable text wrapping
-        table.setWordWrap(True)
-        table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        table.verticalHeader().setDefaultSectionSize(45)  # Back to original size
+        # Set row height
+        table.verticalHeader().setDefaultSectionSize(45)
         
         # Additional styling
         table.setStyleSheet(table.styleSheet() + """
@@ -806,7 +795,6 @@ class TaskManager(QWidget):
                 padding: 8px;
                 border-bottom: 1px solid #edf2f7;
                 white-space: normal;
-                word-wrap: break-word;
             }
         """)
 
@@ -1045,16 +1033,13 @@ class ModernTable(QTableWidget):
                 border: 1px solid #e0e0e0;
                 border-radius: 10px;
                 gridline-color: #edf2f7;
-                outline: none;  /* Remove table outline */
+                outline: none;
             }
             QTableWidget::item {
                 padding: 8px;
                 border-bottom: 1px solid #edf2f7;
                 color: #2d3748;
                 background-color: #ffffff;
-                white-space: normal;
-                word-wrap: break-word;
-                outline: none;  /* Remove item outline */
             }
             QTableWidget::item:alternate {
                 background-color: #f8fafc;
@@ -1063,38 +1048,10 @@ class ModernTable(QTableWidget):
                 background-color: #3b82f6;
                 color: white;
                 border: none;
-                outline: none;  /* Remove selected item outline */
-            }
-            QTableWidget::item:focus {
-                border: none;
-                outline: none;  /* Remove focus outline */
             }
             QTableWidget::item:hover:!selected {
                 background-color: #e5e7eb;
                 color: #1a202c;
-            }
-            QHeaderView::section {
-                background-color: #f8fafc;
-                padding: 12px;
-                border: none;
-                border-bottom: 2px solid #e2e8f0;
-                font-weight: bold;
-                color: #4a5568;
-                font-size: 13px;
-            }
-            QScrollBar:vertical {
-                border: none;
-                background: #edf2f7;
-                width: 10px;
-                border-radius: 5px;
-                margin: 0;
-            }
-            QScrollBar::handle:vertical {
-                background: #cbd5e0;
-                border-radius: 5px;
-            }
-            QScrollBar::handle:vertical:hover {
-                background: #a0aec0;
             }
         """)
         
@@ -1105,11 +1062,7 @@ class ModernTable(QTableWidget):
         self.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.verticalHeader().setVisible(False)
         self.setShowGrid(True)
-        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)  # Prevent focus border
-        
-        # Enable text wrapping
-        self.setWordWrap(True)
-        self.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         
         # Set row height
         self.verticalHeader().setDefaultSectionSize(45)
