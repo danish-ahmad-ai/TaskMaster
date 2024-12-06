@@ -13,6 +13,7 @@ from pathlib import Path
 import logging
 import sys
 import os
+import requests.exceptions
 
 # Initialize logger
 logger = logging.getLogger(__name__)
@@ -50,7 +51,7 @@ class LoginWindow(QWidget):
         main_layout = QVBoxLayout()
         
         # Add welcome message with fade animation
-        self.welcome_label = FadeLabel("Welcome to TaskMaster ✨")
+        self.welcome_label = FadeLabel("Welcome to TaskMaster ")
         self.welcome_label.setFont(QFont("Arial", 24, QFont.Weight.Bold))
         self.welcome_label.setStyleSheet("color: #2c3e50; margin: 20px;")
         main_layout.addWidget(self.welcome_label)
@@ -92,7 +93,7 @@ class LoginWindow(QWidget):
         password_layout.addWidget(self.login_password)
         
         # Add show/hide password button
-        self.show_password_btn = ModernButton("👁️", color="#6c757d")
+        self.show_password_btn = ModernButton("", color="#6c757d")
         self.show_password_btn.setFixedWidth(50)
         self.show_password_btn.setCheckable(True)
         self.show_password_btn.clicked.connect(self.toggle_password_visibility)
@@ -107,7 +108,7 @@ class LoginWindow(QWidget):
         forgot_layout = QHBoxLayout(forgot_container)
         forgot_layout.setContentsMargins(0, 0, 0, 0)
         
-        self.forgot_password_btn = QPushButton("Forgot Password? 🤔")
+        self.forgot_password_btn = QPushButton("Forgot Password? ")
         self.forgot_password_btn.setStyleSheet("""
             QPushButton {
                 border: none;
@@ -129,7 +130,7 @@ class LoginWindow(QWidget):
         
         # Add buttons
         self.login_button = ModernButton("Login")
-        self.guest_button = ModernButton("Continue as Guest 👻", color="#6c757d")
+        self.guest_button = ModernButton("Continue as Guest ", color="#6c757d")
         self.signup_button = ModernButton("Need an account? Sign up", color="#28a745")
         
         login_layout.addWidget(self.login_button)
@@ -170,7 +171,7 @@ class LoginWindow(QWidget):
         signup_password_layout.setSpacing(10)
         
         signup_password_layout.addWidget(self.signup_password)
-        self.show_signup_password_btn = ModernButton("👁️", color="#6c757d")
+        self.show_signup_password_btn = ModernButton("", color="#6c757d")
         self.show_signup_password_btn.setFixedWidth(50)
         self.show_signup_password_btn.setCheckable(True)
         self.show_signup_password_btn.clicked.connect(self.toggle_signup_password_visibility)
@@ -235,7 +236,7 @@ class LoginWindow(QWidget):
             
         except Exception as e:
             print(f"Guest login error: {str(e)}")
-            show_error(self, "Error", "Failed to start guest session. Please try again! 😅")
+            show_error(self, "Error", "Failed to start guest session. Please try again! ")
 
     def handle_signup(self):
         """Handle signup attempt"""
@@ -275,7 +276,7 @@ class LoginWindow(QWidget):
             print("User data stored in database")
             
             # Show success message and clear fields
-            show_success(self, "Success", "Account created successfully! You can now log in. ✨")
+            show_success(self, "Success", "Account created successfully! You can now log in. ")
             self.clear_fields()
             
             # Switch to login page
@@ -307,28 +308,28 @@ class LoginWindow(QWidget):
     def show_welcome_notice(self):
         """Show welcome notice for first-time users"""
         welcome_text = """
-        ✨ Welcome to TaskMaster! ✨
+        Welcome to TaskMaster!
 
         Your Personal Task Management Solution
 
         TaskMaster helps you stay organized with:
         
-        🔐 Secure Cloud Storage
+        Secure Cloud Storage
         • Your tasks are safely stored and synced
         • Access from anywhere, anytime
         
-        🎯 Smart Task Management
+        Smart Task Management
         • Organize tasks efficiently
         • Track completion status
         • Auto-cleanup after 20 days
         
-        Ready to get organized? Let's begin! 🚀
+        Ready to get organized? Let's begin! 
         """
         
         dialog = ModernDialog(
-            "Welcome to TaskMaster ✨",
+            "Welcome to TaskMaster ",
             welcome_text,
-            icon="🎉",
+            icon="",
             buttons=["Let's Begin!"],
             parent=self
         )
@@ -356,7 +357,7 @@ class LoginWindow(QWidget):
         password = self.login_password.text().strip()
         
         if not email or not password:
-            show_error(self, "Error", "Please enter both email and password! 📝")
+            show_error(self, "Error", "Please enter both email and password! ")
             return
         
         try:
@@ -379,31 +380,53 @@ class LoginWindow(QWidget):
             self.app.switch_to_task_manager(user['localId'], email)
             self.clear_fields()
             
+        except requests.exceptions.ConnectionError:
+            print("Network error during login")
+            show_error(self, "Connection Error", "Unable to connect to the server. Please check your internet connection! ")
+        except requests.exceptions.Timeout:
+            print("Login request timed out")
+            show_error(self, "Timeout Error", "Request timed out. Please check your internet connection and try again! ")
         except Exception as e:
             print(f"Login error: {str(e)}")
-            show_error(self, "Error", "Invalid email or password! Please try again. 😕")
+            error_message = "Invalid email or password! Please try again. "
+            if hasattr(e, 'args') and len(e.args) > 0:
+                try:
+                    error_data = json.loads(e.args[1])
+                    if 'error' in error_data:
+                        error_code = error_data['error'].get('message', '')
+                        if error_code == 'INVALID_EMAIL':
+                            error_message = "Invalid email format. Please check your email address. "
+                        elif error_code == 'EMAIL_NOT_FOUND':
+                            error_message = "Email not found. Please check your email or sign up for a new account. "
+                        elif error_code == 'INVALID_PASSWORD':
+                            error_message = "Incorrect password. Please try again. "
+                        elif error_code == 'TOO_MANY_ATTEMPTS_TRY_LATER':
+                            error_message = "Too many failed attempts. Please try again later. "
+                except:
+                    pass
+            show_error(self, "Error", error_message)
 
     def toggle_password_visibility(self):
         """Toggle password visibility"""
         if self.show_password_btn.isChecked():
             self.login_password.setEchoMode(QLineEdit.EchoMode.Normal)
-            self.show_password_btn.setText("🔒")
+            self.show_password_btn.setText("")
         else:
             self.login_password.setEchoMode(QLineEdit.EchoMode.Password)
-            self.show_password_btn.setText("👁️")
+            self.show_password_btn.setText("")
 
     def handle_forgot_password(self):
         """Handle forgot password request"""
         email = self.login_email.text().strip()
         
         if not email:
-            show_error(self, "Error", "Please enter your email address first! 📧")
+            show_error(self, "Error", "Please enter your email address first! ")
             return
         
         try:
             auth.send_password_reset_email(email)
             show_success(self, "Reset Link Sent", 
-                        "Check your email! We've sent you a password reset link! ✨")
+                        "Check your email! We've sent you a password reset link! ")
         except Exception as e:
             print(f"Error sending reset email: {str(e)}")
             show_error(self, "Error", 
@@ -414,11 +437,11 @@ class LoginWindow(QWidget):
         if self.show_signup_password_btn.isChecked():
             self.signup_password.setEchoMode(QLineEdit.EchoMode.Normal)
             self.signup_confirm_password.setEchoMode(QLineEdit.EchoMode.Normal)
-            self.show_signup_password_btn.setText("🔒")
+            self.show_signup_password_btn.setText("")
         else:
             self.signup_password.setEchoMode(QLineEdit.EchoMode.Password)
             self.signup_confirm_password.setEchoMode(QLineEdit.EchoMode.Password)
-            self.show_signup_password_btn.setText("👁️")
+            self.show_signup_password_btn.setText("")
 
     def slide_to_login(self):
         """Animate transition to login page"""
