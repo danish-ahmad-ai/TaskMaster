@@ -169,6 +169,20 @@ class PriorityDelegate(QStyledItemDelegate):
         value = editor.currentText()
         model.setData(index, value)
 
+class TaskNameDelegate(QStyledItemDelegate):
+    def __init__(self, task_manager, parent=None):
+        super().__init__(parent)
+        self.task_manager = task_manager
+
+    def createEditor(self, parent, option, index):
+        return None  # Disable direct editing
+        
+    def editorEvent(self, event, model, option, index):
+        if event.type() == QEvent.Type.MouseButtonDblClick:
+            self.task_manager.update_task()
+            return True
+        return False
+
 class TaskManager(QWidget):
     """Main task management interface."""
     
@@ -892,11 +906,13 @@ class TaskManager(QWidget):
                 self.task_table.itemChanged.disconnect()
             except:
                 pass
-                
+            
             # For active tasks table only (not completed table)
+            task_name_delegate = TaskNameDelegate(self, self.task_table)
             date_delegate = DateDelegate(self.task_table)
             priority_delegate = PriorityDelegate(self.task_table)
             
+            self.task_table.setItemDelegateForColumn(0, task_name_delegate)
             self.task_table.setItemDelegateForColumn(1, date_delegate)
             self.task_table.setItemDelegateForColumn(2, priority_delegate)
             
