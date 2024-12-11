@@ -477,21 +477,24 @@ class AccountManager(QWidget):
         # Define content for each tab
         about_text = """
         <div style='text-align: center;'>
-            <h2 style='color: #4a90e2; margin-bottom: 15px;'>✨ Welcome to TaskMaster! ✨</h2>
+            <h2 style='color: #4a90e2; margin-bottom: 15px;'>✨ TaskMaster Pro ✨</h2>
             
             <p style='font-size: 14px; color: #2c3e50; margin: 10px 0;'>
-                Your Personal Task Management Solution
+                Your Ultimate Task Management Solution
             </p>
             
             <p style='font-size: 13px; color: #34495e; line-height: 1.6;'>
-                TaskMaster helps you stay organized with secure cloud storage,
-                smart task management, and a modern interface.
+                Streamline your productivity with TaskMaster Pro's powerful features,
+                intuitive interface, and secure cloud synchronization.
             </p>
             
             <div style='margin-top: 20px; padding-top: 15px; border-top: 1px solid #eee;'>
                 <p style='font-size: 13px; color: #7f8c8d;'>
-                    Created with ❤️ by <b>Danish Ahmad</b><br>
-                    GitHub: <a href='https://github.com/danish-ahmad-ai' style='color: #4a90e2; text-decoration: none;'>@danish-ahmad-ai</a>
+                    Version 1.0.0<br>
+                    Developed by <b>Danish Ahmad</b><br>
+                    <a href='https://danishahmad.xyz' style='color: #4a90e2; text-decoration: none;'>Portfolio</a> | 
+                    <a href='https://github.com/danish-ahmad-ai' style='color: #4a90e2; text-decoration: none;'>GitHub</a> |
+                    <a href='https://d-techsolutions.agency' style='color: #4a90e2; text-decoration: none;'>D-Tech Solutions</a>
                 </p>
             </div>
         </div>
@@ -499,24 +502,29 @@ class AccountManager(QWidget):
 
         features_text = """
         <div style='padding: 10px;'>
-            <h3 style='color: #4a90e2; margin-bottom: 15px;'>🔐 Secure Cloud Storage</h3>
+            <h3 style='color: #4a90e2; margin-bottom: 15px;'>🔐 Core Features</h3>
             <ul style='list-style-type: none; padding-left: 20px; color: #34495e;'>
-                <li style='margin: 8px 0;'>• Your tasks are safely stored and synced</li>
-                <li style='margin: 8px 0;'>• Access from anywhere, anytime</li>
+                <li style='margin: 8px 0;'>• Smart Task Organization with Priority Levels</li>
+                <li style='margin: 8px 0;'>• Real-time Cloud Synchronization</li>
+                <li style='margin: 8px 0;'>• Secure User Authentication</li>
+                <li style='margin: 8px 0;'>• Customizable Task Categories</li>
+                <li style='margin: 8px 0;'>• Due Date Reminders & Notifications</li>
             </ul>
             
-            <h3 style='color: #4a90e2; margin: 20px 0 15px 0;'>🎯 Smart Task Management</h3>
+            <h3 style='color: #4a90e2; margin: 20px 0 15px 0;'>🛡️ Security Features</h3>
             <ul style='list-style-type: none; padding-left: 20px; color: #34495e;'>
-                <li style='margin: 8px 0;'>• Organize tasks efficiently</li>
-                <li style='margin: 8px 0;'>• Track completion status</li>
-                <li style='margin: 8px 0;'>• Auto-cleanup after 20 days</li>
+                <li style='margin: 8px 0;'>• End-to-End Data Encryption</li>
+                <li style='margin: 8px 0;'>• Secure Token Management</li>
+                <li style='margin: 8px 0;'>• Automatic Session Handling</li>
+                <li style='margin: 8px 0;'>• Regular Security Updates</li>
             </ul>
             
-            <h3 style='color: #4a90e2; margin: 20px 0 15px 0;'>👤 Flexible Access</h3>
+            <h3 style='color: #4a90e2; margin: 20px 0 15px 0;'>💫 User Experience</h3>
             <ul style='list-style-type: none; padding-left: 20px; color: #34495e;'>
-                <li style='margin: 8px 0;'>• Create a personal account</li>
-                <li style='margin: 8px 0;'>• Try it out in guest mode</li>
-                <li style='margin: 8px 0;'>• Secure authentication</li>
+                <li style='margin: 8px 0;'>• Modern & Intuitive Interface</li>
+                <li style='margin: 8px 0;'>• Customizable User Profiles</li>
+                <li style='margin: 8px 0;'>• Cross-Platform Compatibility</li>
+                <li style='margin: 8px 0;'>• Offline Support</li>
             </ul>
         </div>
         """
@@ -525,15 +533,31 @@ class AccountManager(QWidget):
         <div style='padding: 10px;'>
             <h3 style='color: #4a90e2; margin-bottom: 15px;'>💻 Coming Soon</h3>
             <ul style='list-style-type: none; padding-left: 20px; color: #34495e;'>
-                <li style='margin: 8px 0;'>• Dark mode support</li>
-                <li style='margin: 8px 0;'>• Task categories</li>
-                <li style='margin: 8px 0;'>• Task priorities</li>
-                <li style='margin: 8px 0;'>• Mobile app</li>
-                <li style='margin: 8px 0;'>• Team collaboration</li>
+                <li style='margin: 12px 0;'>
+                    <b>🌙 Dark Mode</b><br>
+                    <span style='font-size: 12px; color: #666;'>Enhanced visual comfort with dark theme support</span>
+                </li>
+                <li style='margin: 12px 0;'>
+                    <b>📱 Mobile App</b><br>
+                    <span style='font-size: 12px; color: #666;'>Native iOS and Android applications</span>
+                </li>
+                <li style='margin: 12px 0;'>
+                    <b>🤝 Team Collaboration</b><br>
+                    <span style='font-size: 12px; color: #666;'>Share and collaborate on tasks with team members</span>
+                </li>
+                <li style='margin: 12px 0;'>
+                    <b>📊 Advanced Analytics</b><br>
+                    <span style='font-size: 12px; color: #666;'>Detailed insights into your productivity patterns</span>
+                </li>
+                <li style='margin: 12px 0;'>
+                    <b>🔄 Integration Support</b><br>
+                    <span style='font-size: 12px; color: #666;'>Connect with popular productivity tools</span>
+                </li>
             </ul>
             
             <p style='color: #7f8c8d; font-style: italic; margin-top: 20px; text-align: center;'>
-                Stay tuned for more exciting features!
+                We're constantly improving! Stay tuned for these exciting features. 🚀<br>
+                <span style='font-size: 12px;'>Have suggestions? Email us at mrdanishkhb@gmail.com</span>
             </p>
         </div>
         """
