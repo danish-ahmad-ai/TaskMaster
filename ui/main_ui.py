@@ -1369,12 +1369,16 @@ class TaskManager(QWidget):
                 show_error(self, "Error", "Please log in to access account settings")
                 return
             
-            # Create and show account manager
-            account_manager = AccountManager(self.app, self)
-            account_manager.show()
+            # Create account manager page
+            if not hasattr(self.app.widget_stack, 'account_page'):
+                self.app.widget_stack.account_page = AccountManager(self.app)
+                self.app.widget_stack.addWidget(self.app.widget_stack.account_page)
+            
+            # Switch to account page
+            self.app.widget_stack.setCurrentWidget(self.app.widget_stack.account_page)
             
         except Exception as e:
-            print(f"Error showing account window: {str(e)}")
+            print(f"Error showing account page: {str(e)}")
             show_error(self, "Error", "Failed to open account settings")
 
     def show_task_dialog(self, task_data=None):
