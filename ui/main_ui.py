@@ -326,6 +326,20 @@ class TaskManager(QWidget):
             completed_layout = QVBoxLayout(self.completed_tab)
             completed_layout.setContentsMargins(10, 10, 10, 10)
             completed_layout.setSpacing(10)
+            
+            # Add buttons for completed tasks
+            completed_buttons_layout = QHBoxLayout()
+            self.clear_all_btn = ModernButton("Clear All", color="#dc3545")
+            self.delete_selected_btn = ModernButton("Delete Selected", color="#dc3545")
+            
+            self.clear_all_btn.clicked.connect(self.clear_all_completed_tasks)
+            self.delete_selected_btn.clicked.connect(self.delete_selected_completed_tasks)
+            
+            completed_buttons_layout.addWidget(self.clear_all_btn)
+            completed_buttons_layout.addWidget(self.delete_selected_btn)
+            completed_buttons_layout.addStretch()
+            
+            completed_layout.addLayout(completed_buttons_layout)
             completed_layout.addWidget(self.completed_table)
 
             # Add tabs to tab widget with icons
@@ -1507,6 +1521,80 @@ class TaskManager(QWidget):
         except:
             pass
         return None
+
+    def clear_all_completed_tasks(self):
+        """Delete all completed tasks"""
+        try:
+            # Confirm deletion
+            response = show_question(self, "Clear All", "Are you sure you want to delete all completed tasks?")
+            if response != "Yes":
+                return
+                
+            session = self.app.session_manager.load_session()
+            if not session or not session.get('idToken'):
+                show_error(self, "Error", "Please log in to delete tasks")
+                return
+                
+            # Get all completed tasks
+            tasks = db.child('tasks').child(self.user_id).get(token=session['idToken'])
+            if tasks:
+                for task in tasks.each() or []:
+                    task_data = task.val()
+                    if task_data and task_data.get('completed'):
+                        # Delete the task
+                        db.child('tasks').child(self.user_id).child(task.key()).remove(
+                            token=session['idToken']
+                        )
+                
+            # Clear the completed table
+            self.completed_table.setRowCount(0)
+            self.show_empty_state(self.completed_table, "No completed tasks")
+            show_success(self, "Success", "All completed tasks deleted! 🗑️")
+            
+        except Exception as e:
+            print(f"Error clearing completed tasks: {str(e)}")
+            show_error(self, "Error", "Failed to clear completed tasks")
+
+    def delete_selected_completed_tasks(self):
+        """Delete selected completed tasks"""
+        try:
+            # Get selected rows
+            selected_rows = set(item.row() for item in self.completed_table.selectedItems())
+            if not selected_rows:
+                show_error(self, "Error", "Please select tasks to delete")
+                return
+                
+            # Confirm deletion
+            response = show_question(self, "Delete Selected", 
+                                  f"Are you sure you want to delete {len(selected_rows)} selected task(s)?")
+            if response != "Yes":
+                return
+                
+            session = self.app.session_manager.load_session()
+            if not session or not session.get('idToken'):
+                show_error(self, "Error", "Please log in to delete tasks")
+                return
+                
+            # Delete tasks from Firebase and table
+            for row in sorted(selected_rows, reverse=True):
+                task_key = self.completed_table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+                if task_key:
+                    # Delete from Firebase
+                    db.child('tasks').child(self.user_id).child(task_key).remove(
+                        token=session['idToken']
+                    )
+                    # Remove from table
+                    self.completed_table.removeRow(row)
+                    
+            # Show empty state if no tasks left
+            if self.completed_table.rowCount() == 0:
+                self.show_empty_state(self.completed_table, "No completed tasks")
+                
+            show_success(self, "Success", "Selected tasks deleted! 🗑️")
+            
+        except Exception as e:
+            print(f"Error deleting selected tasks: {str(e)}")
+            show_error(self, "Error", "Failed to delete selected tasks")
 
 # Add this new class for modern table styling
 class ModernTable(QTableWidget):
