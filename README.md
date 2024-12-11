@@ -1,4 +1,3 @@
-
 # 🚀 TaskMaster
 
 A modern, secure task management application built with Python and Firebase. TaskMaster helps you organize your tasks efficiently with a clean, intuitive interface and real-time cloud synchronization.
@@ -115,3 +114,22 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ---
 ⭐ If you find TaskMaster useful, consider giving it a star on [GitHub](https://github.com/danish-ahmad-ai/TaskMaster)!
+
+## ⚠️ Important Security Notice
+Never commit real credentials or API keys. Use the example files as templates:
+
+1. Copy `.env.example` to `.env` and add your credentials
+2. Copy `serviceAccountKey.example.json` to `serviceAccountKey.json` and add your Firebase service account details
+3. Copy `firebase_config.example.json` to `firebase_config.json` and add your Firebase config
+
+## Setup Instructions
+1. Create a new Firebase project
+2. Generate new service account credentials
+3. Update configuration files with new credentials
+4. Never commit the real credential files
+
+## Security Best Practices
+- Keep credentials in environment variables
+- Use `.gitignore` to exclude sensitive files
+- Regularly rotate service account keys
+- Monitor for unauthorized access

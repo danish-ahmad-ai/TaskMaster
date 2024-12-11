@@ -1,14 +1,27 @@
 # Environment variables
 .env
 
-# Firebase credentials
+# Firebase credentials and configs
 serviceAccountKey.json
 firebase_config.json
 
-# Logs
-taskmaster.log
+# Example/template files are OK
+!serviceAccountKey.example.json
+!firebase_config.example.json
+!.env.example
 
-# Python cache
+# Other sensitive files
+*.key
+*.pem
+*.p12
+credentials/
+secrets/
+
+# Logs and local data
+*.log
+.todoapp/
+dist/
+build/
 __pycache__/
 *.py[cod]
 *$py.class
