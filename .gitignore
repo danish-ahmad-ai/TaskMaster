@@ -1,4 +1,14 @@
-# Python cache files
+# Environment variables
+.env
+
+# Firebase credentials
+serviceAccountKey.json
+firebase_config.json
+
+# Logs
+taskmaster.log
+
+# Python cache
 __pycache__/
 *.py[cod]
 *$py.class
@@ -10,41 +20,17 @@ build/
 
 # Virtual environment
 venv/
-env/
-.env/
+.venv/
+ENV/
 
-# IDE specific files
-.idea/
+# IDE settings
 .vscode/
-*.swp
-*.swo
+.idea/
 
-# Firebase config and credentials
-firebase_config.py
-credentials.json
-*.key
-*.pem
-
-# Application specific
-.todoapp/
-*.log
-.session
+# Compiled files
+*.spec
+!TaskMaster.spec
 
 # System files
 .DS_Store
-Thumbs.db
-
-# PyInstaller
-*.spec
-*.manifest
-*.toc
-
-# Compiled files
-*.exe
-*.dll
-*.so
-*.dylib
-
-# Database files
-*.db
-*.sqlite3 
+Thumbs.db 
