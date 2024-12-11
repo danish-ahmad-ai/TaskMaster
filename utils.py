@@ -108,20 +108,22 @@ class SessionManager:
         if not session:
             return None
             
-        # Try to refresh token
-        self.token_manager.refresh_token = session.get('refreshToken')
-        new_token = self.token_manager.get_token(force_refresh=True)
+        # Set refresh token in token manager
+        self.token_manager.set_refresh_token(session.get('refreshToken'))
         
-        if new_token:
-            # Update session with new token, but only pass the required arguments
+        # Try to get token, forcing refresh if needed
+        token = self.token_manager.get_token(force_refresh=True)
+        
+        if token:
+            # Update session with new token
             self.save_session(
                 user_id=session.get('user_id'),
                 email=session.get('email'),
-                token=new_token,
+                token=token,
                 refresh_token=session.get('refreshToken'),
                 is_guest=session.get('is_guest', False)
             )
-            return new_token
+            return token
             
         return None
 

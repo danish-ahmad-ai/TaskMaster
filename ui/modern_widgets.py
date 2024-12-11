@@ -1,8 +1,9 @@
 from PyQt6.QtWidgets import (
-    QPushButton, QLineEdit, QGraphicsDropShadowEffect
+    QPushButton, QLineEdit, QGraphicsDropShadowEffect,
+    QLabel, QWidget
 )
-from PyQt6.QtCore import QPropertyAnimation, QPoint, Qt
-from PyQt6.QtGui import QColor
+from PyQt6.QtCore import QPropertyAnimation, QPoint, Qt, QSize
+from PyQt6.QtGui import QColor, QPainter, QPen, QBrush
 
 class ModernButton(QPushButton):
     def __init__(self, text, color="#4a90e2", parent=None):
@@ -96,3 +97,72 @@ class ModernLineEdit(QLineEdit):
         shadow.setColor(QColor(0, 0, 0, 10))
         shadow.setOffset(0, 1)
         self.setGraphicsEffect(shadow) 
+
+class NotificationButton(QPushButton):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.unread_count = 0
+        self.setFixedSize(40, 40)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setStyleSheet("""
+            QPushButton {
+                background-color: #f8f9fa;
+                border: none;
+                border-radius: 20px;
+                padding: 8px;
+            }
+            QPushButton:hover {
+                background-color: #e9ecef;
+            }
+        """)
+        
+        # Create badge label
+        self.badge = QLabel(self)
+        self.badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.badge.setStyleSheet("""
+            QLabel {
+                color: white;
+                background-color: #dc3545;
+                border-radius: 10px;
+                padding: 2px 5px;
+                margin: 2px;
+                font-size: 10px;
+                font-weight: bold;
+            }
+        """)
+        self.badge.hide()
+        
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
+        # Draw bell icon
+        painter.setPen(QPen(QColor("#495057")))
+        
+        # Simple bell shape
+        width = self.width()
+        height = self.height()
+        bell_width = width * 0.5
+        bell_height = height * 0.5
+        
+        x = (width - bell_width) / 2
+        y = (height - bell_height) / 2
+        
+        # Draw bell body
+        painter.drawEllipse(int(x), int(y), int(bell_width), int(bell_height * 0.7))
+        painter.drawRect(int(x + bell_width * 0.35), int(y + bell_height * 0.7),
+                        int(bell_width * 0.3), int(bell_height * 0.2))
+        
+    def set_notification_count(self, count):
+        self.unread_count = count
+        if count > 0:
+            self.badge.setText(str(count if count <= 99 else "99+"))
+            self.badge.adjustSize()
+            self.badge.move(self.width() - self.badge.width(), 0)
+            self.badge.show()
+        else:
+            self.badge.hide()
+            
+    def get_notification_count(self):
+        return self.unread_count

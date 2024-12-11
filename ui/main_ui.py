@@ -1,13 +1,13 @@
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem, QMessageBox, 
     QLabel, QHeaderView, QFrame, QCheckBox, QInputDialog, QTabWidget, QCalendarWidget, QComboBox, 
-    QDialog, QStyledItemDelegate, QLineEdit
+    QDialog, QStyledItemDelegate, QLineEdit, QMenu, QScrollArea
 )
 from PyQt6.QtCore import Qt, QTimer, QDate, QEvent
 from PyQt6.QtGui import QFont, QColor
-from ui.modern_widgets import ModernButton
+from ui.modern_widgets import ModernButton, NotificationButton
 from ui.custom_widgets import show_error, show_success, show_question, show_message
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, Optional, TYPE_CHECKING
 import logging
 import html
@@ -183,6 +183,120 @@ class TaskNameDelegate(QStyledItemDelegate):
             return True
         return False
 
+class NotificationDialog(QDialog):
+    def __init__(self, task_manager, parent=None):
+        super().__init__(parent)
+        self.task_manager = task_manager
+        self.setWindowTitle("Notifications")
+        self.setMinimumWidth(400)
+        self.setStyleSheet("""
+            QDialog {
+                background-color: white;
+                border-radius: 10px;
+            }
+        """)
+        
+        layout = QVBoxLayout(self)
+        
+        # Header with title and clear button
+        header_layout = QHBoxLayout()
+        title_label = QLabel("Notifications")
+        title_label.setStyleSheet("font-weight: bold; font-size: 14px;")
+        clear_btn = ModernButton("Clear All", color="#6c757d")
+        clear_btn.clicked.connect(self.clear_notifications)
+        header_layout.addWidget(title_label)
+        header_layout.addWidget(clear_btn)
+        layout.addLayout(header_layout)
+        
+        # Create scroll area for notifications
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet("""
+            QScrollArea {
+                border: none;
+                background-color: white;
+            }
+        """)
+        
+        # Container for notifications
+        container = QWidget()
+        self.notifications_layout = QVBoxLayout(container)
+        self.notifications_layout.setSpacing(2)
+        self.notifications_layout.setContentsMargins(0, 0, 0, 0)
+        
+        if not task_manager.notifications:
+            no_notifications = QLabel("No notifications")
+            no_notifications.setStyleSheet("color: #6c757d; padding: 20px;")
+            no_notifications.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.notifications_layout.addWidget(no_notifications)
+        else:
+            for notif in task_manager.notifications:
+                notif_widget = self.create_notification_widget(notif)
+                self.notifications_layout.addWidget(notif_widget)
+        
+        scroll.setWidget(container)
+        layout.addWidget(scroll)
+        
+        # Close button
+        close_btn = ModernButton("Close")
+        close_btn.clicked.connect(self.accept)
+        layout.addWidget(close_btn)
+        
+    def create_notification_widget(self, notif):
+        widget = QFrame()
+        widget.setStyleSheet("""
+            QFrame {
+                background-color: #f8f9fa;
+                border-radius: 4px;
+                padding: 8px;
+                margin: 2px;
+            }
+            QFrame:hover {
+                background-color: #e9ecef;
+            }
+        """)
+        widget.setCursor(Qt.CursorShape.PointingHandCursor)  # Set cursor properly
+        
+        layout = QHBoxLayout(widget)
+        layout.setContentsMargins(8, 4, 8, 4)
+        
+        # Icon and message in one line
+        icon_label = QLabel(notif['icon'])
+        message = QLabel(f"{notif['message']} • {notif['time']}")
+        message.setStyleSheet("color: #4a5568;")
+        
+        layout.addWidget(icon_label)
+        layout.addWidget(message, stretch=1)
+        
+        # Store task key in widget for click handling
+        widget.task_key = notif.get('task_key')
+        
+        # Make widget clickable
+        widget.mousePressEvent = lambda e: self.notification_clicked(notif)
+        
+        return widget
+        
+    def notification_clicked(self, notif):
+        if notif.get('task_key'):
+            # Close notification dialog
+            self.accept()
+            # Open task update dialog
+            self.task_manager.show_task_update_dialog(notif['task_key'])
+            
+    def clear_notifications(self):
+        """Clear all notifications"""
+        self.task_manager.notifications.clear()
+        self.task_manager.notification_btn.set_notification_count(0)
+        
+        # Update the UI to show no notifications
+        for i in reversed(range(self.notifications_layout.count())): 
+            self.notifications_layout.itemAt(i).widget().setParent(None)
+        
+        no_notifications = QLabel("No notifications")
+        no_notifications.setStyleSheet("color: #6c757d; padding: 20px;")
+        no_notifications.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.notifications_layout.addWidget(no_notifications)
+
 class TaskManager(QWidget):
     """Main task management interface."""
     
@@ -193,6 +307,7 @@ class TaskManager(QWidget):
             self.app = app
             self.user_id = None
             self.firebase_ops = FirebaseOperations(app.session_manager)
+            self.notifications = []
             
             print("Initializing TaskManager...")
             self.init_ui()
@@ -382,6 +497,14 @@ class TaskManager(QWidget):
             self.logout_button.clicked.connect(self.logout)
             self.account_button.clicked.connect(self.show_account)
 
+            # Add notification button to the top right
+            self.notification_btn = NotificationButton()
+            self.notification_btn.clicked.connect(self.show_notifications)
+            button_layout.addWidget(self.notification_btn)
+            
+            # Initial notification check
+            QTimer.singleShot(1000, self.check_notifications)
+
             print("UI initialization completed successfully")
 
         except Exception as e:
@@ -460,6 +583,9 @@ class TaskManager(QWidget):
             self.completed_table.blockSignals(False)
             
             print(f"Successfully loaded {active_row} active and {completed_row} completed tasks")
+            
+            # Check for notifications after loading tasks
+            self.check_notifications()
             
         except Exception as e:
             print(f"Error loading initial tasks: {str(e)}")
@@ -751,7 +877,7 @@ class TaskManager(QWidget):
                 
                 # Update table
                 self.task_table.item(row, 1).setText(new_date)
-                show_success(self, "Success", "Due date updated! 📅")
+                show_success(self, "Success", "Due date updated! ����")
                 
         except Exception as e:
             print(f"Error updating due date: {e}")
@@ -1090,87 +1216,29 @@ class TaskManager(QWidget):
             
             # Get task data
             task_key = self.task_table.item(current_row, 0).data(Qt.ItemDataRole.UserRole)
-            current_name = self.task_table.item(current_row, 0).text().split('\n')[0]  # Get just the task name
-            current_date = self.task_table.item(current_row, 1).text()
-            current_priority = self.task_table.item(current_row, 2).text()
+            task_name = self.task_table.item(current_row, 0).text().split('\n')[0]
+            due_date = self.task_table.item(current_row, 1).text()
+            priority = self.task_table.item(current_row, 2).text()
             
-            # Get new task name
-            task_name, ok = QInputDialog.getText(
-                self, 'Update Task', 'Enter new task name:',
-                QLineEdit.EchoMode.Normal, current_name
-            )
+            # Get notes
+            current_text = self.task_table.item(current_row, 0).text()
+            notes = '\n'.join(line.lstrip('• ') for line in current_text.split('\n')[1:] 
+                            if line and line != '+ Add Note')
             
-            if ok and task_name.strip():
-                # Get new due date
-                date_dialog = DatePickerDialog(self)
-                current_qdate = QDate.fromString(current_date, "yyyy-MM-dd")
-                if current_qdate.isValid():
-                    date_dialog.calendar.setSelectedDate(current_qdate)
-                
-                if date_dialog.exec() == QDialog.DialogCode.Accepted:
-                    due_date = date_dialog.calendar.selectedDate().toString("yyyy-MM-dd")
-                    
-                    # Get new priority
-                    priority_dialog = QDialog(self)
-                    priority_dialog.setWindowTitle("Update Priority")
-                    layout = QVBoxLayout(priority_dialog)
-                    
-                    priority_combo = QComboBox()
-                    priority_combo.addItems([
-                        PriorityLevel.URGENT,
-                        PriorityLevel.HIGH,
-                        PriorityLevel.MEDIUM,
-                        PriorityLevel.LOW
-                    ])
-                    
-                    # Set current priority
-                    index = priority_combo.findText(current_priority)
-                    if index >= 0:
-                        priority_combo.setCurrentIndex(index)
-                    
-                    layout.addWidget(priority_combo)
-                    
-                    update_button = ModernButton("Update")
-                    update_button.clicked.connect(priority_dialog.accept)
-                    layout.addWidget(update_button)
-                    
-                    if priority_dialog.exec() == QDialog.DialogCode.Accepted:
-                        priority = priority_combo.currentText()
-                        
-                        # Get current notes
-                        current_text = self.task_table.item(current_row, 0).text()
-                        notes = '\n'.join(line for line in current_text.split('\n')[1:] 
-                                        if line and line != '+ Add Note')
-                        
-                        # Create updated task data
-                        task_data = {
-                            'task_name': self.sanitize_input(task_name),
-                            'due_date': due_date,
-                            'priority': priority,
-                            'priority_value': PriorityLevel.get_priority_value(priority),
-                            'notes': notes,
-                            'updated_at': datetime.now().isoformat()
-                        }
-                        
-                        # Update in Firebase
-                        session = self.app.session_manager.load_session()
-                        if not session or not session.get('idToken'):
-                            show_error(self, "Error", "Please log in to update tasks")
-                            return
-                        
-                        db.child('tasks').child(self.user_id).child(task_key).update(
-                            task_data,
-                            token=session['idToken']
-                        )
-                        
-                        # Update UI
-                        task_data['key'] = task_key
-                        self.load_task_to_table(self.task_table, task_data, current_row)
-                        
-                        # Sort tasks
-                        self.sort_tasks_by_priority()
-                        show_success(self, "Success", "Task updated! 🎯")
-                    
+            # Create task data for dialog
+            task_data = {
+                'key': task_key,
+                'task_name': task_name,
+                'due_date': due_date,
+                'priority': priority,
+                'notes': notes
+            }
+            
+            # Show task dialog with current data
+            updated_data = self.show_task_dialog(task_data)
+            if updated_data:
+                self.update_task_data(current_row, task_key, updated_data)
+            
         except Exception as e:
             print(f"Error updating task: {str(e)}")
             show_error(self, "Error", "Failed to update task")
@@ -1181,7 +1249,7 @@ class TaskManager(QWidget):
             # Get selected row
             current_row = self.task_table.currentRow()
             if current_row < 0:
-                show_error(self, "Error", "Please select a task to toggle")
+                show_error(self, "Error", "Please select a task to mark as completed")
                 return
             
             # Get task data
@@ -1192,8 +1260,8 @@ class TaskManager(QWidget):
             
             # Get notes if any
             current_text = self.task_table.item(current_row, 0).text()
-            notes = '\n'.join(line for line in current_text.split('\n')[1:] 
-                             if line and line != '+ Add Note')
+            notes = '\n'.join(line.lstrip('• ') for line in current_text.split('\n')[1:] 
+                            if line and line != '+ Add Note')
             
             # Create task data
             task_data = {
@@ -1203,39 +1271,46 @@ class TaskManager(QWidget):
                 'priority_value': PriorityLevel.get_priority_value(priority),
                 'completed': True,  # Mark as completed
                 'notes': notes,
+                'completed_at': datetime.now().isoformat(),  # Add completion timestamp
                 'updated_at': datetime.now().isoformat()
             }
             
-            # Update in Firebase
-            session = self.app.session_manager.load_session()
-            if not session or not session.get('idToken'):
-                show_error(self, "Error", "Please log in to update tasks")
-                return
-            
-            db.child('tasks').child(self.user_id).child(task_key).update(
-                task_data,
-                token=session['idToken']
-            )
-            
-            # Move task to completed table
-            task_data['key'] = task_key
-            new_row = self.completed_table.rowCount()
-            self.completed_table.insertRow(new_row)
-            self.load_task_to_table(self.completed_table, task_data, new_row)
-            
-            # Remove from active tasks
-            self.task_table.removeRow(current_row)
-            
-            # Show success message
-            show_success(self, "Success", "Task completed! 🎉")
-            
-            # Update empty states if needed
-            if self.task_table.rowCount() == 0:
-                self.show_empty_state(self.task_table, "No active tasks")
-            
+            try:
+                # Update in Firebase using FirebaseOperations
+                self.firebase_ops.execute_operation(
+                    lambda token: db.child('tasks').child(self.user_id).child(task_key).update(
+                        task_data,
+                        token=token
+                    )
+                )
+                
+                # If update successful, update UI
+                task_data['key'] = task_key
+                new_row = self.completed_table.rowCount()
+                self.completed_table.insertRow(new_row)
+                self.load_task_to_table(self.completed_table, task_data, new_row)
+                
+                # Remove from active tasks
+                self.task_table.removeRow(current_row)
+                
+                # Show success message
+                show_success(self, "Success", "Task completed! 🎉")
+                
+                # Update empty states if needed
+                if self.task_table.rowCount() == 0:
+                    self.show_empty_state(self.task_table, "No active tasks")
+                    
+            except Exception as e:
+                print(f"Error toggling task completion: {str(e)}")
+                if "401" in str(e) or "Permission denied" in str(e):
+                    show_error(self, "Error", "Session expired. Please log in again to continue.")
+                    self.app.switch_to_login()
+                else:
+                    show_error(self, "Error", "Failed to mark task as completed. Please try again.")
+                
         except Exception as e:
             print(f"Error toggling task completion: {str(e)}")
-            show_error(self, "Error", "Failed to update task status")
+            show_error(self, "Error", "Failed to mark task as completed. Please try again.")
 
     def show_empty_state(self, table, message="No tasks"):
         """Show empty state message in table"""
@@ -1595,6 +1670,136 @@ class TaskManager(QWidget):
         except Exception as e:
             print(f"Error deleting selected tasks: {str(e)}")
             show_error(self, "Error", "Failed to delete selected tasks")
+
+    def check_notifications(self):
+        """Check for various notifications"""
+        try:
+            if not self.user_id:
+                return
+                
+            session = self.app.session_manager.load_session()
+            if not session or not session.get('idToken'):
+                return
+                
+            self.notifications = []
+            current_time = datetime.now()
+            
+            # Get all tasks
+            tasks = db.child('tasks').child(self.user_id).get(token=session['idToken'])
+            if not tasks:
+                return
+                
+            for task in tasks.each() or []:
+                task_data = task.val()
+                if not task_data:
+                    continue
+                    
+                # Skip completed tasks
+                if task_data.get('completed'):
+                    continue
+                    
+                task_name = task_data.get('task_name', '')
+                due_date_str = task_data.get('due_date')
+                
+                if due_date_str:
+                    try:
+                        due_date = datetime.strptime(due_date_str, "%Y-%m-%d")
+                        
+                        # Check for overdue tasks
+                        if due_date.date() < current_time.date():
+                            self.notifications.append({
+                                'icon': '⚠️',
+                                'title': 'Overdue Task',
+                                'message': f'"{task_name}" was due on {due_date_str}',
+                                'time': 'Overdue',
+                                'type': 'overdue',
+                                'task_key': task.key()
+                            })
+                        
+                        # Check for tasks due today
+                        elif due_date.date() == current_time.date():
+                            self.notifications.append({
+                                'icon': '📅',
+                                'title': 'Due Today',
+                                'message': f'"{task_name}" is due today',
+                                'time': 'Today',
+                                'type': 'due_today',
+                                'task_key': task.key()
+                            })
+                        
+                        # Check for tasks due tomorrow
+                        elif due_date.date() == (current_time + timedelta(days=1)).date():
+                            self.notifications.append({
+                                'icon': '⏰',
+                                'title': 'Due Tomorrow',
+                                'message': f'"{task_name}" is due tomorrow',
+                                'time': 'Tomorrow',
+                                'type': 'due_tomorrow',
+                                'task_key': task.key()
+                            })
+                        
+                        # Check for tasks due within a week
+                        elif due_date.date() <= (current_time + timedelta(days=7)).date():
+                            days_until = (due_date.date() - current_time.date()).days
+                            self.notifications.append({
+                                'icon': '📌',
+                                'title': 'Upcoming Task',
+                                'message': f'"{task_name}" is due in {days_until} days',
+                                'time': f'Due in {days_until} days',
+                                'type': 'upcoming',
+                                'task_key': task.key()
+                            })
+                    except ValueError:
+                        continue
+            
+            # Update notification badge
+            self.notification_btn.set_notification_count(len(self.notifications))
+            
+        except Exception as e:
+            print(f"Error checking notifications: {str(e)}")
+            
+    def show_notifications(self):
+        """Show notifications dialog"""
+        dialog = NotificationDialog(self, self)
+        dialog.exec()
+        
+        # Clear notification count after viewing
+        self.notification_btn.set_notification_count(0)
+        
+    def show_task_update_dialog(self, task_key):
+        """Show update dialog for a specific task"""
+        try:
+            # Find the task in the active tasks table
+            for row in range(self.task_table.rowCount()):
+                if self.task_table.item(row, 0).data(Qt.ItemDataRole.UserRole) == task_key:
+                    # Get current task data
+                    task_name = self.task_table.item(row, 0).text().split('\n')[0]
+                    due_date = self.task_table.item(row, 1).text()
+                    priority = self.task_table.item(row, 2).text()
+                    
+                    # Get notes
+                    current_text = self.task_table.item(row, 0).text()
+                    notes = '\n'.join(line.lstrip('• ') for line in current_text.split('\n')[1:] 
+                                    if line and line != '+ Add Note')
+                    
+                    # Create task data for dialog
+                    task_data = {
+                        'key': task_key,
+                        'task_name': task_name,
+                        'due_date': due_date,
+                        'priority': priority,
+                        'notes': notes
+                    }
+                    
+                    # Show task dialog with current data
+                    updated_data = self.show_task_dialog(task_data)
+                    if updated_data:
+                        self.update_task_data(row, task_key, updated_data)
+                    break
+                    
+        except Exception as e:
+            print(f"Error showing task update dialog: {str(e)}")
+            show_error(self, "Error", "Failed to open task update dialog")
 
 # Add this new class for modern table styling
 class ModernTable(QTableWidget):

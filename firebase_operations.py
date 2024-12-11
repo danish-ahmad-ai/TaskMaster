@@ -45,9 +45,8 @@ class FirebaseOperations:
                 
             except Exception as e:
                 last_error = e
-                if "Permission denied" in str(e) and attempt < max_retries - 1:
-                    # Try refreshing token and retry
-                    self.session_manager.refresh_token()
+                if attempt < max_retries - 1:
+                    # Try getting a new token for the next attempt
                     continue
                     
         raise last_error  # Re-raise the last error if all retries failed
