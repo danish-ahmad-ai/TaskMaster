@@ -1,3 +1,4 @@
+
 # 🚀 TaskMaster
 
 A modern, secure task management application built with Python and Firebase. TaskMaster helps you organize your tasks efficiently with a clean, intuitive interface and real-time cloud synchronization.

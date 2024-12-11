@@ -507,13 +507,13 @@ class AccountManager(QWidget):
                 <li style='margin: 8px 0;'>• Smart Task Organization with Priority Levels</li>
                 <li style='margin: 8px 0;'>• Real-time Cloud Synchronization</li>
                 <li style='margin: 8px 0;'>• Secure User Authentication</li>
-                <li style='margin: 8px 0;'>• Customizable Task Categories</li>
                 <li style='margin: 8px 0;'>• Due Date Reminders & Notifications</li>
+                <li style='margin: 8px 0;'>• Guest Mode Access</li>
             </ul>
             
             <h3 style='color: #4a90e2; margin: 20px 0 15px 0;'>🛡️ Security Features</h3>
             <ul style='list-style-type: none; padding-left: 20px; color: #34495e;'>
-                <li style='margin: 8px 0;'>• End-to-End Data Encryption</li>
+                <li style='margin: 8px 0;'>• Secure Data Storage</li>
                 <li style='margin: 8px 0;'>• Secure Token Management</li>
                 <li style='margin: 8px 0;'>• Automatic Session Handling</li>
                 <li style='margin: 8px 0;'>• Regular Security Updates</li>
@@ -523,8 +523,8 @@ class AccountManager(QWidget):
             <ul style='list-style-type: none; padding-left: 20px; color: #34495e;'>
                 <li style='margin: 8px 0;'>• Modern & Intuitive Interface</li>
                 <li style='margin: 8px 0;'>• Customizable User Profiles</li>
-                <li style='margin: 8px 0;'>• Cross-Platform Compatibility</li>
-                <li style='margin: 8px 0;'>• Offline Support</li>
+                <li style='margin: 8px 0;'>• Task Priority Management</li>
+                <li style='margin: 8px 0;'>• Auto-cleanup of Completed Tasks</li>
             </ul>
         </div>
         """
@@ -546,8 +546,8 @@ class AccountManager(QWidget):
                     <span style='font-size: 12px; color: #666;'>Share and collaborate on tasks with team members</span>
                 </li>
                 <li style='margin: 12px 0;'>
-                    <b>📊 Advanced Analytics</b><br>
-                    <span style='font-size: 12px; color: #666;'>Detailed insights into your productivity patterns</span>
+                    <b>💾 Offline Support</b><br>
+                    <span style='font-size: 12px; color: #666;'>Continue working without internet connection</span>
                 </li>
                 <li style='margin: 12px 0;'>
                     <b>🔄 Integration Support</b><br>
