@@ -13,12 +13,43 @@ import os
 import requests
 from PyQt6.QtWidgets import QGraphicsDropShadowEffect
 from PyQt6.QtGui import QColor
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from ui.main_ui import TaskManager
 
 class AccountManager(QWidget):
     def __init__(self, app, parent=None):
         super().__init__(parent)
         self.app = app
+        self.user_id = None
+        
+        # Get session data
+        session = self.app.session_manager.load_session()
+        if session and session.get('user_id'):
+            self.user_id = session['user_id']
+            
         self.init_ui()
+        
+        # Load user data after UI is initialized
+        if self.user_id:
+            try:
+                # Get user data from Firebase
+                user_data = db.child('users').child(self.user_id).get(token=session['idToken']).val()
+                if user_data:
+                    self.set_user_data(user_data)
+                else:
+                    # If no user data exists, create initial data
+                    user_data = {
+                        'email': session.get('email', ''),
+                        'username': '',
+                        'updated_at': datetime.now().isoformat()
+                    }
+                    db.child('users').child(self.user_id).set(user_data, token=session['idToken'])
+                    self.set_user_data(user_data)
+            except Exception as e:
+                print(f"Error loading user data: {str(e)}")
+                show_error(self, "Error", "Failed to load account data. Please try again!")
+                self.close()
 
     def init_ui(self):
         self.setWindowTitle("My Account")
@@ -430,8 +461,16 @@ class AccountManager(QWidget):
 
     def go_back(self):
         """Return to task manager"""
-        if hasattr(self.parent(), 'setCurrentWidget'):
-            self.parent().setCurrentWidget(self.parent().widget(1))  # Switch to task manager 
+        try:
+            # Get the task manager widget (it should be at index 1)
+            task_manager = self.app.widget_stack.widget(1)
+            if task_manager:
+                self.app.widget_stack.setCurrentWidget(task_manager)
+        except Exception as e:
+            print(f"Error returning to task manager: {e}")
+            # Fallback - try to switch to widget at index 1
+            if self.app.widget_stack.count() > 1:
+                self.app.widget_stack.setCurrentWidget(self.app.widget_stack.widget(1))
 
     def show_app_info(self):
         """Show the welcome/about dialog with tabs"""

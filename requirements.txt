@@ -1,8 +1,22 @@
-PyQt6==6.6.1
-pyrebase4==4.7.1
-firebase-admin==6.4.0
-requests==2.31.0
-python-dotenv==1.0.0
-pyinstaller==6.3.0
-cryptography==41.0.7
-urllib3==2.1.0 
+# Core Dependencies
+PyQt6>=6.4.0
+pyrebase4>=4.7.1
+firebase-admin>=6.2.0
+cryptography>=41.0.0
+
+# Network & API
+requests>=2.31.0
+urllib3>=2.0.0
+
+# Date & Time
+python-dateutil>=2.8.2
+
+# Development Tools
+pyinstaller>=6.2.0  # For creating executables
+pytest>=7.4.0       # For testing
+black>=23.9.1       # For code formatting
+flake8>=6.1.0       # For linting
+
+# Optional Dependencies
+pillow>=10.0.0      # For image handling
+python-dotenv>=1.0.0  # For environment variables 
