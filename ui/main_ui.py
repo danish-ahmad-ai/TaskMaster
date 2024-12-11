@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem, QMessageBox, 
     QLabel, QHeaderView, QFrame, QCheckBox, QInputDialog, QTabWidget, QCalendarWidget, QComboBox, 
-    QDialog, QStyledItemDelegate, QLineEdit, QTextEdit
+    QDialog, QStyledItemDelegate, QLineEdit
 )
 from PyQt6.QtCore import Qt, QTimer, QDate, QEvent
 from PyQt6.QtGui import QFont, QColor
@@ -230,9 +230,29 @@ class TaskManager(QWidget):
             # Create tables first
             self.task_table = ModernTable()
             self.completed_table = ModernTable()
+            
+            # Setup tables with columns and formatting
+            for table in [self.task_table, self.completed_table]:
+                table.setColumnCount(3)
+                table.setHorizontalHeaderLabels(["Task Name", "Due Date", "Priority"])
+                
+                # Set column widths
+                header = table.horizontalHeader()
+                header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+                header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
+                header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+                table.setColumnWidth(1, 120)
+                table.setColumnWidth(2, 120)
+                
+                # Enable word wrap and adjust row heights
+                table.setWordWrap(True)
+                table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+                
+                # Connect double-click handler only for active tasks table
+                if table == self.task_table:
+                    table.cellDoubleClicked.connect(self.handle_cell_double_click)
 
-            # Setup tables before adding to layout
-            self.setup_tables()
+            # Remove the setup_tables call since we're doing it here
             self.setup_delegates()
 
             # Add tab widget with improved styling
@@ -367,563 +387,69 @@ class TaskManager(QWidget):
             print(f"Error in set_user_id: {str(e)}")
 
     def load_initial_tasks(self):
-        """Load initial tasks without showing alerts"""
+        """Load tasks from Firebase"""
         try:
-            print("Loading initial tasks...")
-            
-            # Clear existing rows first
-            self.task_table.setRowCount(0)
-            self.completed_table.setRowCount(0)
-            
-            # Get session
             session = self.app.session_manager.load_session()
             if not session or not session.get('idToken'):
-                print("No valid session found")
+                show_error(self, "Error", "Please log in to view tasks")
                 return
+            
+            # Clear existing tasks
+            self.task_table.setRowCount(0)
+            self.completed_table.setRowCount(0)
             
             # Get tasks from Firebase
             tasks = db.child('tasks').child(self.user_id).get(token=session['idToken'])
             
+            if not tasks:
+                self.show_empty_state(self.task_table, "No active tasks")
+                self.show_empty_state(self.completed_table, "No completed tasks")
+                return
+            
             active_row = 0
             completed_row = 0
             
-            if tasks and tasks.each():
-                # Temporarily disconnect itemChanged signal
-                self.task_table.blockSignals(True)
-                self.completed_table.blockSignals(True)
-                
-                for task in tasks.each():
-                    task_data = task.val()
-                    if task_data:
-                        is_completed = task_data.get('completed', False)
-                        target_table = self.completed_table if is_completed else self.task_table
-                        current_row = completed_row if is_completed else active_row
-                        
-                        # Insert row
-                        target_table.insertRow(current_row)
-                        
-                        # Create items
-                        name_item = QTableWidgetItem(task_data.get('task_name', ''))
-                        date_item = QTableWidgetItem(task_data.get('due_date', 'N/A'))
-                        priority_item = QTableWidgetItem(task_data.get('priority', 'Low'))
-                        
-                        # Store task key
-                        name_item.setData(Qt.ItemDataRole.UserRole, task.key())
-                        
-                        # If task is completed, make items uneditable and add strikethrough
-                        if is_completed:
-                            font = name_item.font()
-                            font.setStrikeOut(True)
-                            name_item.setFont(font)
-                            date_item.setFont(font)
-                            priority_item.setFont(font)
-                            
-                            # Make items uneditable
-                            name_item.setFlags(name_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                            date_item.setFlags(date_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                            priority_item.setFlags(priority_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                            
-                            # Add completed styling
-                            name_item.setForeground(QColor("#9CA3AF"))
-                            date_item.setForeground(QColor("#9CA3AF"))
-                            priority_item.setForeground(QColor("#9CA3AF"))
-                        
-                        # Set items
-                        target_table.setItem(current_row, 0, name_item)
-                        target_table.setItem(current_row, 1, date_item)
-                        target_table.setItem(current_row, 2, priority_item)
-                        
-                        # Update counters
-                        if is_completed:
-                            completed_row += 1
-                        else:
-                            active_row += 1
-                
-                # Re-enable signals
-                self.task_table.blockSignals(False)
-                self.completed_table.blockSignals(False)
+            # Block signals during loading
+            self.task_table.blockSignals(True)
+            self.completed_table.blockSignals(True)
             
-            # Show empty states if needed
-            if active_row == 0:
-                self.show_empty_state(self.task_table, "No active tasks")
-            if completed_row == 0:
-                self.show_empty_state(self.completed_table, "No completed tasks")
+            for task in tasks.each() or []:
+                try:
+                    task_data = task.val()
+                    if not task_data:
+                        continue
+                    
+                    # Add key to task data
+                    task_data['key'] = task.key()
+                    
+                    # Determine which table to use
+                    is_completed = task_data.get('completed', False)
+                    target_table = self.completed_table if is_completed else self.task_table
+                    current_row = completed_row if is_completed else active_row
+                    
+                    # Add row and load task
+                    target_table.insertRow(current_row)
+                    self.load_task_to_table(target_table, task_data, current_row)
+                    
+                    # Update counter
+                    if is_completed:
+                        completed_row += 1
+                    else:
+                        active_row += 1
+                    
+                except Exception as e:
+                    print(f"Error loading task: {str(e)}")
+                    continue
+                
+            # Re-enable signals
+            self.task_table.blockSignals(False)
+            self.completed_table.blockSignals(False)
             
             print(f"Successfully loaded {active_row} active and {completed_row} completed tasks")
             
         except Exception as e:
             print(f"Error loading initial tasks: {str(e)}")
-            self.show_empty_state(self.task_table, "Error loading tasks")
-            self.show_empty_state(self.completed_table, "Error loading tasks")
-
-    def setup_tables(self):
-        """Setup both tables with their configurations"""
-        try:
-            for table in [self.task_table, self.completed_table]:
-                # Basic setup
-                table.setColumnCount(3)
-                table.setHorizontalHeaderLabels(["Task Name", "Due Date", "Priority"])
-                
-                # Column sizes
-                header = table.horizontalHeader()
-                header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-                header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
-                header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
-                table.setColumnWidth(1, 120)
-                table.setColumnWidth(2, 120)
-                
-                # Hide vertical header
-                table.verticalHeader().setVisible(False)
-                
-                # Selection behavior
-                table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-                table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
-                
-                # Set initial empty state
-                self.show_empty_state(table)
-                
-        except Exception as e:
-            print(f"Error setting up tables: {str(e)}")
-
-    def sanitize_input(self, text: str) -> str:
-        """Sanitize user input."""
-        # Remove HTML tags
-        text = html.escape(text)
-        
-        # Remove potentially dangerous characters
-        text = re.sub(r'[^\w\s-]', '', text)
-        
-        # Limit length
-        return text[:200]  # Limit to 200 characters
-        
-    def add_task(self):
-        """Add a new task with date picker and priority"""
-        try:
-            # Create a custom dialog for task input
-            dialog = QDialog(self)
-            dialog.setWindowTitle("Add Task")
-            layout = QVBoxLayout(dialog)
-
-            # Add title with styling
-            title_label = QLabel("Add New Task ✨")
-            title_label.setStyleSheet("""
-                QLabel {
-                    color: #2c3e50;
-                    font-size: 18px;
-                    font-weight: bold;
-                    padding: 10px 0;
-                }
-            """)
-            title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            layout.addWidget(title_label)
-
-            # Task name input with character counter
-            layout.addWidget(QLabel("Task Name:"))
-            task_input = QLineEdit()
-            task_input.setMaxLength(50)
-            task_input.setStyleSheet("""
-                QLineEdit {
-                    padding: 8px;
-                    border: 1px solid #e0e0e0;
-                    border-radius: 6px;
-                    background-color: #f8f9fa;
-                    color: #2d3748;
-                    font-size: 13px;
-                    min-height: 30px;
-                }
-                QLineEdit:focus {
-                    border: 1px solid #4a90e2;
-                    background-color: white;
-                }
-            """)
-
-            # Add character counter label
-            char_counter = QLabel("50 characters remaining")
-            char_counter.setStyleSheet("color: #666; font-size: 11px;")
-            
-            def update_counter():
-                remaining = 50 - len(task_input.text())
-                char_counter.setText(f"{remaining} characters remaining")
-                if remaining < 10:
-                    char_counter.setStyleSheet("color: #dc3545; font-size: 11px;")
-                else:
-                    char_counter.setStyleSheet("color: #666; font-size: 11px;")
-
-            task_input.textChanged.connect(update_counter)
-            
-            layout.addWidget(task_input)
-            layout.addWidget(char_counter)
-
-            # Add date picker
-            layout.addWidget(QLabel("Due Date:"))
-            date_picker = QCalendarWidget()
-            date_picker.setMinimumDate(QDate.currentDate())
-            layout.addWidget(date_picker)
-
-            # Add priority selector
-            layout.addWidget(QLabel("Priority:"))
-            priority_combo = QComboBox()
-            priority_combo.addItems([
-                PriorityLevel.URGENT,
-                PriorityLevel.HIGH,
-                PriorityLevel.MEDIUM,
-                PriorityLevel.LOW
-            ])
-            layout.addWidget(priority_combo)
-
-            # Add buttons
-            button_layout = QHBoxLayout()
-            add_button = ModernButton("Add Task")
-            cancel_button = ModernButton("Cancel", color="#6c757d")
-            
-            button_layout.addWidget(cancel_button)
-            button_layout.addWidget(add_button)
-            
-            layout.addLayout(button_layout)
-
-            # Connect buttons
-            add_button.clicked.connect(dialog.accept)
-            cancel_button.clicked.connect(dialog.reject)
-
-            if dialog.exec() == QDialog.DialogCode.Accepted:
-                # Get values
-                task_name = task_input.text().strip()
-                due_date = date_picker.selectedDate().toString("yyyy-MM-dd")
-                priority = priority_combo.currentText()
-
-                if not task_name:
-                    show_error(self, "Error", "Please enter a task name!")
-                    return
-
-                # Get session
-                session = self.app.session_manager.load_session()
-                if not session or not session.get('idToken'):
-                    show_error(self, "Error", "Please log in to add tasks!")
-                    return
-
-                # Create task data
-                task_data = {
-                    'task_name': self.sanitize_input(task_name),
-                    'due_date': due_date,
-                    'priority': priority,
-                    'priority_value': PriorityLevel.get_priority_value(priority),
-                    'completed': False,
-                    'created_at': datetime.now().isoformat(),
-                    'updated_at': datetime.now().isoformat()
-                }
-
-                try:
-                    # Add to Firebase
-                    db.child('tasks').child(self.user_id).push(task_data, token=session['idToken'])
-
-                    # Refresh task list using load_initial_tasks instead of safe_refresh_task_list
-                    self.load_initial_tasks()
-                    show_success(self, "Success", "Task added successfully! ✨")
-                    
-                except Exception as e:
-                    print(f"Error saving task to Firebase: {str(e)}")
-                    show_error(self, "Error", "Failed to save task. Please try again!")
-
-        except Exception as e:
-            print(f"Error adding task: {str(e)}")
-            show_error(self, "Error", "Failed to add task. Please try again! 😅")
-
-    def update_task(self):
-        """Update selected task"""
-        try:
-            selected_items = self.task_table.selectedItems()
-            if not selected_items:
-                show_error(self, "Error", "Please select a task to update")
-                return
-            
-            row = selected_items[0].row()
-            task_key = self.task_table.item(row, 0).data(Qt.ItemDataRole.UserRole)
-            
-            # Get current values
-            current_name = self.task_table.item(row, 0).text()
-            current_date = self.task_table.item(row, 1).text()
-            current_priority = self.task_table.item(row, 2).text()
-            
-            # Create update dialog
-            update_dialog = QDialog(self)
-            update_dialog.setWindowTitle("Update Task")
-            update_dialog.setMinimumWidth(400)
-            layout = QVBoxLayout(update_dialog)
-            
-            # Task name input with character limit
-            layout.addWidget(QLabel("Task Name:"))
-            name_input = QLineEdit()
-            name_input.setText(current_name)
-            name_input.setMaxLength(50)
-            name_input.setStyleSheet("""
-                QLineEdit {
-                    padding: 8px;
-                    border: 1px solid #e0e0e0;
-                    border-radius: 6px;
-                    background-color: white;
-                    font-size: 13px;
-                    min-height: 30px;
-                    color: #2d3748;
-                }
-                QLineEdit:focus {
-                    border: 1px solid #4a90e2;
-                }
-            """)
-
-            # Add character counter
-            char_counter = QLabel(f"{50 - len(current_name)} characters remaining")
-            char_counter.setStyleSheet("color: #666; font-size: 11px;")
-            
-            def update_counter():
-                remaining = 50 - len(name_input.text())
-                char_counter.setText(f"{remaining} characters remaining")
-                if remaining < 10:
-                    char_counter.setStyleSheet("color: #dc3545; font-size: 11px;")
-                else:
-                    char_counter.setStyleSheet("color: #666; font-size: 11px;")
-
-            name_input.textChanged.connect(update_counter)
-            
-            layout.addWidget(name_input)
-            layout.addWidget(char_counter)
-            
-            # Date picker
-            layout.addWidget(QLabel("Due Date:"))
-            date_picker = QCalendarWidget()
-            try:
-                current_qdate = QDate.fromString(current_date, "yyyy-MM-dd")
-                if current_qdate.isValid():
-                    date_picker.setSelectedDate(current_qdate)
-            except:
-                date_picker.setSelectedDate(QDate.currentDate())
-            layout.addWidget(date_picker)
-            
-            # Priority dropdown
-            layout.addWidget(QLabel("Priority:"))
-            priority_combo = QComboBox()
-            priority_combo.addItems([
-                PriorityLevel.URGENT,
-                PriorityLevel.HIGH,
-                PriorityLevel.MEDIUM,
-                PriorityLevel.LOW
-            ])
-            index = priority_combo.findText(current_priority)
-            if index >= 0:
-                priority_combo.setCurrentIndex(index)
-            layout.addWidget(priority_combo)
-            
-            # Update button
-            update_btn = ModernButton("Update Task")
-            update_btn.clicked.connect(update_dialog.accept)
-            layout.addWidget(update_btn)
-            
-            if update_dialog.exec() == QDialog.DialogCode.Accepted:
-                # Get session
-                session = self.app.session_manager.load_session()
-                if not session or not session.get('idToken'):
-                    show_error(self, "Error", "Please log in again to update task")
-                    return
-                    
-                # Get new values
-                new_name = name_input.text().strip()
-                new_date = date_picker.selectedDate().toString("yyyy-MM-dd")
-                new_priority = priority_combo.currentText()
-                
-                # Update in Firebase
-                db.child('tasks').child(self.user_id).child(task_key).update({
-                    'task_name': new_name,
-                    'due_date': new_date,
-                    'priority': new_priority,
-                    'priority_value': PriorityLevel.get_priority_value(new_priority),
-                    'updated_at': datetime.now().isoformat()
-                }, token=session['idToken'])
-                
-                # Refresh task list
-                self.load_initial_tasks()
-                show_success(self, "Success", "Task updated successfully! ✨")
-                
-        except Exception as e:
-            print(f"Error updating task: {e}")
-            show_error(self, "Error", "Failed to update task")
-
-    def logout(self):
-        """Logout and switch to the login screen."""
-        self.app.switch_to_login()
-
-    def show_account(self):
-        """Switch to account management"""
-        try:
-            session = self.app.session_manager.load_session()
-            if not session or not session.get('idToken'):
-                show_error(self, "Error", "Please log in to view your account! 🔑")
-                self.app.switch_to_login()
-                return
-
-            # First check if it's a guest user
-            if session.get('is_guest'):
-                show_error(
-                    self, 
-                    "Guest Mode", 
-                    "This area is for registered users only! Please sign up to access your account. "
-                )
-                return
-
-            try:
-                # Get user data with timeout
-                user_data = db.child('users').child(session['user_id']).get(token=session['idToken']).val()
-                
-                if user_data:
-                    print("Successfully loaded user data")
-                    self.app.account_manager.set_user_data(user_data)
-                    self.app.widget_stack.setCurrentWidget(self.app.account_manager)
-                else:
-                    show_error(self, "Error", "Could not load account data. Please try again! ")
-                    
-            except Exception as e:
-                print(f"Error loading account data: {str(e)}")
-                show_error(self, "Error", "Failed to load account data. Please try again! 😅")
-
-        except Exception as e:
-            print(f"Error in show_account: {str(e)}")
-            show_error(self, "Error", "Something went wrong. Please try again! 😅")
-
-    def debug_print(self):
-        """Debug function to print current state"""
-        print("\n=== DEBUG INFO ===")
-        print(f"Current user: {global_state.get_user()}")
-        if global_state.get_user():
-            print(f"Token exists: {'idToken' in global_state.get_user()}")
-            print(f"Token value: {global_state.get_user().get('idToken', 'None')[:20]}..." if global_state.get_user().get('idToken') else "No token")
-        print(f"User ID: {self.user_id}")
-        
-        session = self.app.session_manager.load_session()
-        print("\nSession data:")
-        if session:
-            print(f"- User ID: {session.get('user_id')}")
-            print(f"- Email: {session.get('email')}")
-            print(f"- Logged in: {session.get('logged_in')}")
-            print(f"- Token exists: {session.get('idToken') is not None}")
-            if session.get('idToken'):
-                print(f"- Token value: {session['idToken'][:20]}...")
-        else:
-            print("No session found")
-
-    def toggle_task_completion(self):
-        """Move task to completed tab"""
-        current_row = self.task_table.currentRow()
-        if current_row < 0:
-            show_error(self, "Error", "Please select a task first! ✓")
-            return
-
-        try:
-            # Get task data
-            task_item = self.task_table.item(current_row, 0)  # Task name column
-            if not task_item:
-                return
-
-            task_key = task_item.data(Qt.ItemDataRole.UserRole)
-            
-            # Get session
-            session = self.app.session_manager.load_session()
-            if not session:
-                show_error(self, "Error", "Please log in to continue! 🔑")
-                self.app.switch_to_login()
-                return
-
-            token = session.get('idToken')
-            if not token:
-                show_error(self, "Error", "Please log in again! 🔑")
-                self.app.switch_to_login()
-                return
-
-            # Update task as completed with timestamp
-            update_data = {
-                'completed': True,
-                'completed_at': datetime.now().isoformat()
-            }
-            
-            # Update in Firebase
-            db.child('tasks').child(self.user_id).child(task_key).update(update_data, token=token)
-            
-            # Switch to completed tab
-            self.tab_widget.setCurrentWidget(self.completed_tab)
-            
-            # Refresh tables
-            self.load_initial_tasks()
-            
-            # Show success message
-            show_success(self, "Success", "Task marked as completed! 🎉")
-
-        except Exception as e:
-            print(f"Error completing task: {str(e)}")
-            show_error(self, "Error", "Something went wrong. Please try again! 😅")
-
-    def get_valid_token(self):
-        """Get a valid token for Firebase operations"""
-        try:
-            # First try to get token from current user
-            if global_state.get_user() and global_state.get_user().get('idToken'):
-                return global_state.get_user()['idToken']
-            
-            # Then try to get from session
-            session = self.app.session_manager.load_session()
-            if session and session.get('idToken'):
-                return session['idToken']
-            
-            # No valid token found
-            show_error(self, "Error", "Please log in to continue! 🔑")
-            self.app.switch_to_login()
-            return None
-            
-        except Exception as e:
-            print(f"Error getting token: {str(e)}")
-            return None
-
-    def refresh_token(self):
-        """Refresh the authentication token"""
-        try:
-            session = self.app.session_manager.load_session()
-            if not session:
-                return None
-
-            refresh_token = session.get('refreshToken')
-            if not refresh_token:
-                return None
-
-            # Try to refresh the token
-            try:
-                user = auth.refresh(refresh_token)
-                if not user or not user.get('idToken'):
-                    return None
-
-                # Update session with new token
-                new_token = user['idToken']
-                self.app.session_manager.save_session(
-                    user_id=session.get('user_id'),
-                    email=session.get('email'),
-                    token=new_token,
-                    refresh_token=refresh_token
-                )
-
-                # Update current_user
-                global_state.set_user({
-                    'localId': session.get('user_id'),
-                    'email': session.get('email'),
-                    'idToken': new_token,
-                    'refreshToken': refresh_token,
-                    'isGuest': session.get('is_guest', False)
-                })
-
-                print("Token refreshed successfully")
-                return new_token
-
-            except Exception as e:
-                print(f"Error refreshing token: {str(e)}")
-                return None
-
-        except Exception as e:
-            print(f"Error in refresh_token: {str(e)}")
-            return None
+            show_error(self, "Error", "Failed to load tasks")
 
     def setup_delegates(self):
         """Set up delegates for table columns"""
@@ -935,16 +461,19 @@ class TaskManager(QWidget):
                 pass
             
             # For active tasks table only (not completed table)
-            task_name_delegate = TaskNameDelegate(self, self.task_table)
             date_delegate = DateDelegate(self.task_table)
             priority_delegate = PriorityDelegate(self.task_table)
             
-            self.task_table.setItemDelegateForColumn(0, task_name_delegate)
+            # Remove the task name delegate to prevent direct editing
             self.task_table.setItemDelegateForColumn(1, date_delegate)
             self.task_table.setItemDelegateForColumn(2, priority_delegate)
             
-            # Connect to cell change events - only once
-            self.task_table.itemChanged.connect(self.handle_item_change)
+            # Make task name column non-editable
+            for row in range(self.task_table.rowCount()):
+                if self.task_table.item(row, 0):
+                    self.task_table.item(row, 0).setFlags(
+                        self.task_table.item(row, 0).flags() & ~Qt.ItemFlag.ItemIsEditable
+                    )
             
         except Exception as e:
             print(f"Error setting up delegates: {e}")
@@ -1117,40 +646,45 @@ class TaskManager(QWidget):
                       message or f"An error occurred: {str(error)}")
 
     def sort_tasks_by_priority(self):
-        """Sort tasks by priority value"""
-        rows = self.task_table.rowCount()
-        items = []
-        
-        # Collect all rows
-        for row in range(rows):
-            items.append({
-                'name': self.task_table.item(row, 0).text(),
-                'date': self.task_table.item(row, 1).text(),
-                'priority': self.task_table.item(row, 2).text(),
-                'priority_value': PriorityLevel.get_priority_value(
-                    self.task_table.item(row, 2).text()
-                ),
-                'key': self.task_table.item(row, 0).data(Qt.ItemDataRole.UserRole)
-            })
-        
-        # Sort by priority value
-        items.sort(key=lambda x: x['priority_value'])
-        
-        # Repopulate table
-        self.task_table.setRowCount(0)
-        for item in items:
-            row = self.task_table.rowCount()
-            self.task_table.insertRow(row)
+        """Sort tasks by priority"""
+        try:
+            rows = self.task_table.rowCount()
+            tasks = []
             
-            name_item = QTableWidgetItem(item['name'])
-            date_item = QTableWidgetItem(item['date'])
-            priority_item = QTableWidgetItem(item['priority'])
+            # Collect all tasks
+            for row in range(rows):
+                task_name = self.task_table.item(row, 0).text()
+                due_date = self.task_table.item(row, 1).text()
+                priority = self.task_table.item(row, 2).text()
+                task_key = self.task_table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+                priority_value = PriorityLevel.get_priority_value(priority)
+                
+                tasks.append({
+                    'row': row,
+                    'task_name': task_name,
+                    'due_date': due_date,
+                    'priority': priority,
+                    'priority_value': priority_value,
+                    'key': task_key
+                })
             
-            name_item.setData(Qt.ItemDataRole.UserRole, item['key'])
+            # Sort by priority value
+            tasks.sort(key=lambda x: x['priority_value'])
             
-            self.task_table.setItem(row, 0, name_item)
-            self.task_table.setItem(row, 1, date_item)
-            self.task_table.setItem(row, 2, priority_item)
+            # Reorder table
+            for new_row, task in enumerate(tasks):
+                old_row = task['row']
+                if new_row != old_row:
+                    self.task_table.insertRow(new_row)
+                    for col in range(self.task_table.columnCount()):
+                        self.task_table.setItem(
+                            new_row, 
+                            col, 
+                            self.task_table.takeItem(old_row + (1 if old_row > new_row else 0), col))
+                    self.task_table.removeRow(old_row + (1 if old_row > new_row else 0))
+            
+        except Exception as e:
+            print(f"Error sorting tasks: {str(e)}")
 
     def handle_item_double_click(self, item):
         """Handle double-click on table items"""
@@ -1262,49 +796,763 @@ class TaskManager(QWidget):
             print(f"Error updating priority: {e}")
             show_error(self, "Error", "Failed to update priority")
 
+    def handle_cell_double_click(self, row, column):
+        """Handle double-click on table cells"""
+        try:
+            # Only handle double-clicks in the task name column (column 0) for active tasks
+            if column == 0 and self.tab_widget.currentWidget() == self.active_tab:
+                # Get the item safely
+                current_item = self.task_table.item(row, 0)
+                if not current_item:
+                    return
+                
+                # Store the task key before any operations
+                task_key = current_item.data(Qt.ItemDataRole.UserRole)
+                if not task_key:
+                    return
+                
+                # Get the text content safely
+                task_text = current_item.text()
+                if not task_text:
+                    return
+                
+                # Split into lines and get task name and notes
+                lines = task_text.split('\n')
+                task_name = lines[0] if lines else ""
+                notes = '\n'.join(line.lstrip('• ') for line in lines[1:] if line.strip())
+                
+                # Get current task data
+                task_data = {
+                    'task_name': task_name,
+                    'due_date': self.task_table.item(row, 1).text(),
+                    'priority': self.task_table.item(row, 2).text(),
+                    'notes': notes
+                }
+                
+                # Show update dialog
+                updated_data = self.show_task_dialog(task_data)
+                if updated_data:
+                    self.update_task_data(row, task_key, updated_data)
+                
+        except Exception as e:
+            print(f"Error handling cell double-click: {str(e)}")
+
+    def add_note(self, row):
+        """Add a note to the selected task"""
+        try:
+            task_key = self.task_table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+            if not task_key:
+                return
+            
+            current_item = self.task_table.item(row, 0)
+            if not current_item:
+                return
+            
+            current_text = current_item.text().replace('+ Add Note', '').strip()
+            task_name = current_text.split('\n')[0]
+            
+            # Create small popup dialog
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Add Note")
+            dialog.setFixedWidth(300)
+            layout = QVBoxLayout(dialog)
+            
+            # Note input
+            note_input = QLineEdit()
+            note_input.setPlaceholderText("Enter note (max 100 characters)")
+            note_input.setMaxLength(100)
+            layout.addWidget(note_input)
+            
+            # Buttons
+            button_layout = QHBoxLayout()
+            add_btn = ModernButton("Add", color="#4a90e2")
+            cancel_btn = ModernButton("Cancel", color="#6c757d")
+            
+            button_layout.addWidget(cancel_btn)
+            button_layout.addWidget(add_btn)
+            layout.addLayout(button_layout)
+            
+            add_btn.clicked.connect(dialog.accept)
+            cancel_btn.clicked.connect(dialog.reject)
+            
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                note_text = note_input.text().strip()
+                if note_text:
+                    # Get existing notes
+                    notes = [line for line in current_text.split('\n')[1:] 
+                            if line and line != '+ Add Note']
+                    notes.append(f"• {note_text}")
+                    
+                    # Update in Firebase
+                    session = self.app.session_manager.load_session()
+                    if session and session.get('idToken'):
+                        db.child('tasks').child(self.user_id).child(task_key).update({
+                            'notes': '\n'.join(notes),
+                            'updated_at': datetime.now().isoformat()
+                        }, token=session['idToken'])
+                        
+                        # Update UI
+                        new_text = task_name + '\n' + '\n'.join(notes)
+                        current_item.setText(new_text)
+                        self.task_table.resizeRowToContents(row)
+                        
+        except Exception as e:
+            print(f"Error adding note: {str(e)}")
+            show_error(self, "Error", "Failed to add note")
+
+    def load_task_to_table(self, table, task_data, row):
+        """Load task data into table"""
+        try:
+            # Get task name and notes
+            task_name = task_data.get('task_name', '')
+            notes = task_data.get('notes', '')
+            
+            # Create items
+            name_item = QTableWidgetItem()
+            date_item = QTableWidgetItem(task_data.get('due_date', 'N/A'))
+            priority_item = QTableWidgetItem(task_data.get('priority', 'Low'))
+            
+            # Build display text
+            if table == self.completed_table:
+                # For completed tasks - apply strikethrough to everything
+                font = QFont()
+                font.setStrikeOut(True)
+                
+                # Format task name and notes with strikethrough
+                display_text = task_name
+                if notes:
+                    notes_list = [note.strip() for note in notes.split('\n') if note.strip()]
+                    if notes_list:
+                        display_text += '\n' + '\n'.join(f"• {note}" for note in notes_list)
+                
+                # Apply strikethrough font to all items
+                name_item.setFont(font)
+                date_item.setFont(font)
+                priority_item.setFont(font)
+                
+                # Set gray color for completed items
+                gray_color = QColor("#6c757d")
+                name_item.setForeground(gray_color)
+                date_item.setForeground(gray_color)
+                priority_item.setForeground(gray_color)
+                
+            else:
+                # For active tasks
+                display_text = task_name
+                if notes:
+                    notes_list = [note.strip() for note in notes.split('\n') if note.strip()]
+                    if notes_list:
+                        display_text += '\n' + '\n'.join(f"• {note}" for note in notes_list)
+                
+                # Make task name bold for active tasks
+                font = QFont()
+                font.setBold(True)
+                name_item.setFont(font)
+            
+            # Set the text
+            name_item.setText(display_text)
+            
+            # Store task key
+            name_item.setData(Qt.ItemDataRole.UserRole, task_data.get('key'))
+            
+            # Make task name non-editable
+            name_item.setFlags(name_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            
+            # Set items in table
+            table.setItem(row, 0, name_item)
+            table.setItem(row, 1, date_item)
+            table.setItem(row, 2, priority_item)
+            
+            # Adjust row height
+            table.resizeRowToContents(row)
+            
+        except Exception as e:
+            print(f"Error loading task to table: {str(e)}")
+
+    def add_task(self):
+        """Add a new task"""
+        try:
+            task_data = self.show_task_dialog()
+            if task_data:
+                session = self.app.session_manager.load_session()
+                if not session or not session.get('idToken'):
+                    show_error(self, "Error", "Please log in to add tasks")
+                    return
+                    
+                # Ensure all required fields are present for Firebase validation
+                task_data.update({
+                    'created_at': datetime.now().isoformat(),
+                    'updated_at': datetime.now().isoformat(),
+                    'user_id': self.user_id,
+                    'completed': False
+                })
+                
+                try:
+                    # Save to Firebase
+                    task_ref = db.child('tasks').child(self.user_id).push(
+                        task_data,
+                        token=session['idToken']
+                    )
+                    
+                    if task_ref and task_ref.get('name'):
+                        task_data['key'] = task_ref['name']
+                        row = self.task_table.rowCount()
+                        self.task_table.insertRow(row)
+                        self.load_task_to_table(self.task_table, task_data, row)
+                        self.sort_tasks_by_priority()
+                        show_success(self, "Success", "Task added! 🎯")
+                    else:
+                        show_error(self, "Error", "Failed to save task")
+                        
+                except Exception as firebase_error:
+                    if "401" in str(firebase_error) or "Permission denied" in str(firebase_error):
+                        show_error(self, "Error", "Session expired. Please log in again.")
+                        self.app.switch_to_login()
+                    else:
+                        raise firebase_error
+                    
+        except Exception as e:
+            print(f"Error adding task: {str(e)}")
+            show_error(self, "Error", "Failed to add task")
+
+    def sanitize_input(self, text):
+        """Sanitize user input"""
+        # Remove HTML tags
+        text = re.sub(r'<[^>]+>', '', text)
+        # Escape special characters
+        text = html.escape(text)
+        # Limit length
+        return text[:200]  # Limit to 200 characters
+
+    def sort_tasks_by_priority(self):
+        """Sort tasks by priority"""
+        try:
+            rows = self.task_table.rowCount()
+            tasks = []
+            
+            # Collect all tasks
+            for row in range(rows):
+                task_name = self.task_table.item(row, 0).text()
+                due_date = self.task_table.item(row, 1).text()
+                priority = self.task_table.item(row, 2).text()
+                task_key = self.task_table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+                priority_value = PriorityLevel.get_priority_value(priority)
+                
+                tasks.append({
+                    'row': row,
+                    'task_name': task_name,
+                    'due_date': due_date,
+                    'priority': priority,
+                    'priority_value': priority_value,
+                    'key': task_key
+                })
+            
+            # Sort by priority value
+            tasks.sort(key=lambda x: x['priority_value'])
+            
+            # Reorder table
+            for new_row, task in enumerate(tasks):
+                old_row = task['row']
+                if new_row != old_row:
+                    self.task_table.insertRow(new_row)
+                    for col in range(self.task_table.columnCount()):
+                        self.task_table.setItem(
+                            new_row, 
+                            col, 
+                            self.task_table.takeItem(old_row + (1 if old_row > new_row else 0), col))
+                    self.task_table.removeRow(old_row + (1 if old_row > new_row else 0))
+            
+        except Exception as e:
+            print(f"Error sorting tasks: {str(e)}")
+
+    def update_task(self):
+        """Update the selected task"""
+        try:
+            # Get selected row
+            current_row = self.task_table.currentRow()
+            if current_row < 0:
+                show_error(self, "Error", "Please select a task to update")
+                return
+            
+            # Get task data
+            task_key = self.task_table.item(current_row, 0).data(Qt.ItemDataRole.UserRole)
+            current_name = self.task_table.item(current_row, 0).text().split('\n')[0]  # Get just the task name
+            current_date = self.task_table.item(current_row, 1).text()
+            current_priority = self.task_table.item(current_row, 2).text()
+            
+            # Get new task name
+            task_name, ok = QInputDialog.getText(
+                self, 'Update Task', 'Enter new task name:',
+                QLineEdit.EchoMode.Normal, current_name
+            )
+            
+            if ok and task_name.strip():
+                # Get new due date
+                date_dialog = DatePickerDialog(self)
+                current_qdate = QDate.fromString(current_date, "yyyy-MM-dd")
+                if current_qdate.isValid():
+                    date_dialog.calendar.setSelectedDate(current_qdate)
+                
+                if date_dialog.exec() == QDialog.DialogCode.Accepted:
+                    due_date = date_dialog.calendar.selectedDate().toString("yyyy-MM-dd")
+                    
+                    # Get new priority
+                    priority_dialog = QDialog(self)
+                    priority_dialog.setWindowTitle("Update Priority")
+                    layout = QVBoxLayout(priority_dialog)
+                    
+                    priority_combo = QComboBox()
+                    priority_combo.addItems([
+                        PriorityLevel.URGENT,
+                        PriorityLevel.HIGH,
+                        PriorityLevel.MEDIUM,
+                        PriorityLevel.LOW
+                    ])
+                    
+                    # Set current priority
+                    index = priority_combo.findText(current_priority)
+                    if index >= 0:
+                        priority_combo.setCurrentIndex(index)
+                    
+                    layout.addWidget(priority_combo)
+                    
+                    update_button = ModernButton("Update")
+                    update_button.clicked.connect(priority_dialog.accept)
+                    layout.addWidget(update_button)
+                    
+                    if priority_dialog.exec() == QDialog.DialogCode.Accepted:
+                        priority = priority_combo.currentText()
+                        
+                        # Get current notes
+                        current_text = self.task_table.item(current_row, 0).text()
+                        notes = '\n'.join(line for line in current_text.split('\n')[1:] 
+                                        if line and line != '+ Add Note')
+                        
+                        # Create updated task data
+                        task_data = {
+                            'task_name': self.sanitize_input(task_name),
+                            'due_date': due_date,
+                            'priority': priority,
+                            'priority_value': PriorityLevel.get_priority_value(priority),
+                            'notes': notes,
+                            'updated_at': datetime.now().isoformat()
+                        }
+                        
+                        # Update in Firebase
+                        session = self.app.session_manager.load_session()
+                        if not session or not session.get('idToken'):
+                            show_error(self, "Error", "Please log in to update tasks")
+                            return
+                        
+                        db.child('tasks').child(self.user_id).child(task_key).update(
+                            task_data,
+                            token=session['idToken']
+                        )
+                        
+                        # Update UI
+                        task_data['key'] = task_key
+                        self.load_task_to_table(self.task_table, task_data, current_row)
+                        
+                        # Sort tasks
+                        self.sort_tasks_by_priority()
+                        show_success(self, "Success", "Task updated! 🎯")
+                    
+        except Exception as e:
+            print(f"Error updating task: {str(e)}")
+            show_error(self, "Error", "Failed to update task")
+
+    def toggle_task_completion(self):
+        """Toggle task completion status"""
+        try:
+            # Get selected row
+            current_row = self.task_table.currentRow()
+            if current_row < 0:
+                show_error(self, "Error", "Please select a task to toggle")
+                return
+            
+            # Get task data
+            task_key = self.task_table.item(current_row, 0).data(Qt.ItemDataRole.UserRole)
+            task_name = self.task_table.item(current_row, 0).text().split('\n')[0]  # Get just the task name
+            due_date = self.task_table.item(current_row, 1).text()
+            priority = self.task_table.item(current_row, 2).text()
+            
+            # Get notes if any
+            current_text = self.task_table.item(current_row, 0).text()
+            notes = '\n'.join(line for line in current_text.split('\n')[1:] 
+                             if line and line != '+ Add Note')
+            
+            # Create task data
+            task_data = {
+                'task_name': task_name,
+                'due_date': due_date,
+                'priority': priority,
+                'priority_value': PriorityLevel.get_priority_value(priority),
+                'completed': True,  # Mark as completed
+                'notes': notes,
+                'updated_at': datetime.now().isoformat()
+            }
+            
+            # Update in Firebase
+            session = self.app.session_manager.load_session()
+            if not session or not session.get('idToken'):
+                show_error(self, "Error", "Please log in to update tasks")
+                return
+            
+            db.child('tasks').child(self.user_id).child(task_key).update(
+                task_data,
+                token=session['idToken']
+            )
+            
+            # Move task to completed table
+            task_data['key'] = task_key
+            new_row = self.completed_table.rowCount()
+            self.completed_table.insertRow(new_row)
+            self.load_task_to_table(self.completed_table, task_data, new_row)
+            
+            # Remove from active tasks
+            self.task_table.removeRow(current_row)
+            
+            # Show success message
+            show_success(self, "Success", "Task completed! 🎉")
+            
+            # Update empty states if needed
+            if self.task_table.rowCount() == 0:
+                self.show_empty_state(self.task_table, "No active tasks")
+            
+        except Exception as e:
+            print(f"Error toggling task completion: {str(e)}")
+            show_error(self, "Error", "Failed to update task status")
+
+    def show_empty_state(self, table, message="No tasks"):
+        """Show empty state message in table"""
+        table.setRowCount(1)
+        empty_item = QTableWidgetItem(message)
+        empty_item.setFlags(Qt.ItemFlag.NoItemFlags)  # Make it non-editable
+        empty_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        # Apply styling
+        font = QFont()
+        font.setItalic(True)
+        empty_item.setFont(font)
+        empty_item.setForeground(QColor("#6c757d"))  # Gray color
+        
+        table.setItem(0, 0, empty_item)
+        table.setSpan(0, 0, 1, table.columnCount())  # Merge all columns
+
+    def logout(self):
+        """Handle user logout"""
+        try:
+            # Confirm logout
+            response = show_question(self, "Logout", "Are you sure you want to logout?")
+            if response == "Yes":
+                print("Switching to login and clearing session...")
+                
+                # Clear user ID
+                self.set_user_id(None)
+                
+                # Clear tables
+                self.task_table.setRowCount(0)
+                self.completed_table.setRowCount(0)
+                self.show_empty_state(self.task_table, "Please log in to view tasks")
+                self.show_empty_state(self.completed_table, "Please log in to view tasks")
+                
+                # Clear Firebase token
+                token_manager.clear()
+                
+                # Clear session
+                self.app.session_manager.clear_session()
+                
+                # Switch to login window
+                self.app.switch_to_login()
+                
+        except Exception as e:
+            print(f"Error during logout: {str(e)}")
+            show_error(self, "Error", "Failed to logout properly")
+
+    def show_account(self):
+        """Show account management window"""
+        try:
+            from ui.account_ui import AccountManager
+            
+            # Check if user is logged in
+            session = self.app.session_manager.load_session()
+            if not session or not session.get('idToken'):
+                show_error(self, "Error", "Please log in to access account settings")
+                return
+            
+            # Create and show account manager
+            account_manager = AccountManager(self.app, self)
+            account_manager.show()
+            
+        except Exception as e:
+            print(f"Error showing account window: {str(e)}")
+            show_error(self, "Error", "Failed to open account settings")
+
+    def show_task_dialog(self, task_data=None):
+        """Show dialog for adding/updating task with notes"""
+        try:
+            is_update = task_data is not None
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Update Task" if is_update else "Add New Task")
+            dialog.setFixedWidth(400)
+            layout = QVBoxLayout(dialog)
+            
+            # Task name section
+            name_label = QLabel("Task Name:")
+            name_input = QLineEdit()
+            if is_update:
+                name_input.setText(task_data.get('task_name', ''))
+            layout.addWidget(name_label)
+            layout.addWidget(name_input)
+            
+            # Due date
+            date_label = QLabel("Due Date:")
+            calendar = QCalendarWidget()
+            if is_update:
+                current_date = QDate.fromString(task_data.get('due_date', ''), "yyyy-MM-dd")
+                if current_date.isValid():
+                    calendar.setSelectedDate(current_date)
+            layout.addWidget(date_label)
+            layout.addWidget(calendar)
+            
+            # Priority
+            priority_label = QLabel("Priority:")
+            priority_combo = QComboBox()
+            priority_combo.addItems([
+                PriorityLevel.URGENT,
+                PriorityLevel.HIGH,
+                PriorityLevel.MEDIUM,
+                PriorityLevel.LOW
+            ])
+            if is_update:
+                index = priority_combo.findText(task_data.get('priority', ''))
+                if index >= 0:
+                    priority_combo.setCurrentIndex(index)
+            layout.addWidget(priority_label)
+            layout.addWidget(priority_combo)
+            
+            # Notes section
+            notes_label = QLabel("Notes:")
+            layout.addWidget(notes_label)
+            
+            notes_layout = QVBoxLayout()
+            note_inputs = []
+            
+            def add_note_input(text=''):
+                note_container = QWidget()
+                note_layout = QHBoxLayout(note_container)
+                note_layout.setContentsMargins(0, 0, 0, 0)
+                
+                note_input = QLineEdit()
+                note_input.setPlaceholderText("Add a note (max 100 characters)")
+                note_input.setMaxLength(100)
+                note_input.setText(text)
+                
+                remove_btn = ModernButton("×", color="#dc3545")
+                remove_btn.setFixedSize(30, 30)
+                
+                note_layout.addWidget(note_input)
+                note_layout.addWidget(remove_btn)
+                
+                notes_layout.addWidget(note_container)
+                note_inputs.append((note_container, note_input))
+                
+                remove_btn.clicked.connect(lambda: remove_note_input(note_container))
+            
+            def remove_note_input(container):
+                container.deleteLater()
+                for i, (cont, _) in enumerate(note_inputs):
+                    if cont == container:
+                        note_inputs.pop(i)
+                        break
+            
+            # Add existing notes
+            if is_update and task_data.get('notes'):
+                for note in task_data.get('notes').split('\n'):
+                    if note.strip():
+                        add_note_input(note.strip())
+            
+            if not note_inputs:
+                add_note_input()
+            
+            layout.addLayout(notes_layout)
+            
+            # Add note button
+            add_note_btn = ModernButton("+ Add Another Note", color="#28a745")
+            add_note_btn.clicked.connect(lambda: add_note_input())
+            layout.addWidget(add_note_btn)
+            
+            # Buttons layout
+            button_layout = QHBoxLayout()
+            
+            # Add delete button for existing tasks
+            if is_update:
+                delete_btn = ModernButton("Delete Task", color="#dc3545")
+                delete_btn.clicked.connect(lambda: self.delete_task(task_data.get('key'), dialog))
+                button_layout.addWidget(delete_btn)
+            
+            cancel_btn = ModernButton("Cancel", color="#6c757d")
+            save_btn = ModernButton("Update" if is_update else "Add Task", color="#4a90e2")
+            
+            button_layout.addWidget(cancel_btn)
+            button_layout.addWidget(save_btn)
+            layout.addLayout(button_layout)
+            
+            cancel_btn.clicked.connect(dialog.reject)
+            save_btn.clicked.connect(dialog.accept)
+            
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                task_name = name_input.text().strip()
+                if task_name:
+                    notes = [input.text().strip() for _, input in note_inputs if input.text().strip()]
+                    
+                    return {
+                        'task_name': self.sanitize_input(task_name),
+                        'due_date': calendar.selectedDate().toString("yyyy-MM-dd"),
+                        'priority': priority_combo.currentText(),
+                        'priority_value': PriorityLevel.get_priority_value(priority_combo.currentText()),
+                        'notes': '\n'.join(notes),
+                        'completed': False,
+                        'updated_at': datetime.now().isoformat(),
+                        'created_at': task_data.get('created_at', datetime.now().isoformat()) if is_update else datetime.now().isoformat()
+                    }
+            return None
+            
+        except Exception as e:
+            print(f"Error in task dialog: {str(e)}")
+            show_error(self, "Error", "Failed to process task dialog")
+            return None
+
+    def delete_task(self, task_key, dialog=None):
+        """Delete a task"""
+        try:
+            response = show_question(self, "Delete Task", "Are you sure you want to delete this task?")
+            if response == "Yes":
+                session = self.app.session_manager.load_session()
+                if not session or not session.get('idToken'):
+                    show_error(self, "Error", "Please log in to delete tasks")
+                    return
+                
+                # Delete from Firebase
+                db.child('tasks').child(self.user_id).child(task_key).remove(token=session['idToken'])
+                
+                # Reload tasks
+                self.load_initial_tasks()
+                
+                show_success(self, "Success", "Task deleted successfully")
+                
+                # Close the dialog if it exists
+                if dialog:
+                    dialog.reject()
+                
+        except Exception as e:
+            print(f"Error deleting task: {str(e)}")
+            show_error(self, "Error", "Failed to delete task")
+
+    def update_task_data(self, row, task_key, updated_data):
+        """Update task data in Firebase and UI"""
+        try:
+            # Get session
+            session = self.app.session_manager.load_session()
+            if not session or not session.get('idToken'):
+                show_error(self, "Error", "Please log in to update tasks")
+                return
+
+            # Ensure required fields are present for Firebase validation
+            updated_data.update({
+                'updated_at': datetime.now().isoformat(),
+                'user_id': self.user_id,
+                # Preserve existing fields
+                'created_at': self.get_task_created_at(task_key) or datetime.now().isoformat(),
+                'task_name': updated_data.get('task_name') or self.task_table.item(row, 0).text().split('\n')[0]
+            })
+
+            try:
+                # Update in Firebase
+                db.child('tasks').child(self.user_id).child(task_key).update(
+                    updated_data,
+                    token=session['idToken']
+                )
+                
+                # Update UI
+                updated_data['key'] = task_key
+                self.load_task_to_table(self.task_table, updated_data, row)
+                
+                # Sort if priority changed
+                current_priority = self.task_table.item(row, 2).text()
+                if current_priority != updated_data.get('priority'):
+                    self.sort_tasks_by_priority()
+                
+                show_success(self, "Success", "Task updated! 🎯")
+                
+            except Exception as firebase_error:
+                if "401" in str(firebase_error) or "Permission denied" in str(firebase_error):
+                    show_error(self, "Error", "Session expired. Please log in again.")
+                    self.app.switch_to_login()
+                else:
+                    raise firebase_error
+                
+        except Exception as e:
+            print(f"Error updating task data: {str(e)}")
+            show_error(self, "Error", "Failed to update task")
+
+    def get_task_created_at(self, task_key):
+        """Get the created_at timestamp for an existing task"""
+        try:
+            session = self.app.session_manager.load_session()
+            if session and session.get('idToken'):
+                task = db.child('tasks').child(self.user_id).child(task_key).get(token=session['idToken'])
+                if task and task.val():
+                    return task.val().get('created_at')
+        except:
+            pass
+        return None
+
 # Add this new class for modern table styling
 class ModernTable(QTableWidget):
     def __init__(self):
         super().__init__()
         self.setStyleSheet("""
             QTableWidget {
-                background-color: white;
-                border: 1px solid #e0e0e0;
-                border-radius: 10px;
-                gridline-color: #edf2f7;
-                outline: none;
+                background-color: #f5f7fa;
+                border: 1px solid #e1e8ed;
+                border-radius: 8px;
+                gridline-color: #e1e8ed;
             }
             QTableWidget::item {
                 padding: 8px;
-                border-bottom: 1px solid #edf2f7;
-                color: #2d3748;
-                background-color: #ffffff;
-            }
-            QTableWidget::item:alternate {
-                background-color: #f8fafc;
+                border-bottom: 1px solid #e1e8ed;
+                color: #2c3e50;
+                font-size: 13px;
             }
             QTableWidget::item:selected {
-                background-color: #3b82f6;
-                color: white;
-                border: none;
+                background-color: #edf2f7;
+                color: #2c3e50;
             }
-            QTableWidget::item:hover:!selected {
-                background-color: #e5e7eb;
-                color: #1a202c;
+            QTableWidget::item:hover {
+                background-color: #edf2f7;
+            }
+            QTableWidget QHeaderView::section {
+                background-color: #f8f9fa;
+                color: #2c3e50;
+                padding: 10px;
+                border: none;
+                border-bottom: 2px solid #e1e8ed;
+                font-weight: bold;
+                font-size: 13px;
+            }
+            QTableWidget QHeaderView::section:hover {
+                background-color: #edf2f7;
             }
         """)
         
-        # Table settings
-        self.setAlternatingRowColors(True)
+        self.setAlternatingRowColors(False)  # Disable alternating colors
         self.setFrameShape(QFrame.Shape.NoFrame)
         self.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.verticalHeader().setVisible(False)
         self.setShowGrid(True)
-        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        
-        # Set row height
-        self.verticalHeader().setDefaultSectionSize(45)
+        self.setWordWrap(True)
 
     def mousePressEvent(self, event):
         """Handle mouse press events"""
