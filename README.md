@@ -2,6 +2,15 @@
 
 A modern, secure task management application built with Python and Firebase.
 
+## Features
+- Secure user authentication
+- Real-time task synchronization
+- Priority management
+- Due date tracking
+- Task notes and details
+- Profile management
+- Secure data storage
+
 ## Setup
 
 1. Create a credentials folder:
@@ -18,6 +27,23 @@ cp .env.example credentials/.env
 
 3. Update the copied files with your Firebase credentials
 
+4. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+5. Run the application:
+```bash
+python run.py
+```
+
+## Security
+- All sensitive data is stored securely
+- Firebase Authentication for user management
+- Real-time database with secure rules
+- Token-based authentication
+- Encrypted session storage
+
 ## Repository
 
 - Main repository: https://github.com/danish-ahmad-ai/TaskMaster
@@ -31,3 +57,8 @@ Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduc
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Author
+Danish Ahmad
+- GitHub: [@danish-ahmad-ai](https://github.com/danish-ahmad-ai)
+- Website: [danishahmad.xyz](https://danishahmad.xyz)

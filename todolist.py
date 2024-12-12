@@ -4,7 +4,7 @@ from ui.login_ui import LoginWindow
 from ui.main_ui import TaskManager
 from utils import SessionManager
 from ui.account_ui import AccountManager
-from firebase_config import current_user
+from firebase_config import current_user, token_manager
 from pathlib import Path
 import logging
 from PyQt6.QtGui import QIcon
@@ -88,19 +88,29 @@ class ToDoListApp(QApplication):
         """Switch to login and clear session"""
         global current_user
         
-        print("Switching to login and clearing session...")
+        logger.info("Switching to login and clearing session...")
         
-        # Clear any existing session data
-        self.session_manager.clear_session()
-        
-        # Reset current_user
-        current_user = None
-        
-        # Reset task manager state
-        self.task_manager.set_user_id(None)
-        
-        # Switch to login window
-        self.widget_stack.setCurrentWidget(self.login_window)
+        try:
+            # Clear any existing session data
+            self.session_manager.clear_session()
+            
+            # Reset current_user
+            current_user = None
+            
+            # Clear token manager
+            token_manager.clear()
+            
+            # Reset task manager state
+            self.task_manager.set_user_id(None)
+            
+            # Switch to login window
+            self.widget_stack.setCurrentWidget(self.login_window)
+            
+            logger.info("Successfully switched to login")
+        except Exception as e:
+            logger.error(f"Error switching to login: {e}")
+            # Continue with logout even if there's an error
+            self.widget_stack.setCurrentWidget(self.login_window)
 
     def cleanup(self) -> None:
         """Perform cleanup operations before exit."""

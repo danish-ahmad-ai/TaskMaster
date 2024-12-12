@@ -1,9 +1,13 @@
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Dict
 from firebase_admin import auth, db
 from datetime import datetime, timedelta
 from collections import deque
 import time
 from utils import SessionManager
+import logging
+
+# Setup logging
+logger = logging.getLogger(__name__)
 
 class FirebaseOperations:
     """Handles Firebase operations with automatic token refresh and error handling."""
@@ -81,3 +85,31 @@ class RateLimitedFirebaseOperations(FirebaseOperations):
         """Execute rate-limited operation."""
         self._check_rate_limit()
         return super().execute_operation(operation, *args, **kwargs)
+
+def login(email: str, password: str) -> Optional[Dict]:
+    """Login user with email and password"""
+    try:
+        if not firebase_app:
+            logger.error("Firebase not initialized")
+            return None
+            
+        auth = firebase_app["auth"]
+        db = firebase_app["db"]
+        
+        # Attempt login
+        user = auth.sign_in_with_email_and_password(email, password)
+        logger.info(f"User logged in successfully: {user.get('email')}")
+        
+        # Test database access
+        try:
+            user_data = db.child("users").child(user["localId"]).get(user["idToken"])
+            logger.info("Database access successful")
+        except Exception as e:
+            logger.error(f"Database access failed: {str(e)}")
+            raise
+            
+        return user
+        
+    except Exception as e:
+        logger.error(f"Login failed: {str(e)}")
+        return None

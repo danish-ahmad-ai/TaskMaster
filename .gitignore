@@ -30,30 +30,3 @@ build/
 # Logs and local data
 *.log
 .todoapp/
-dist/
-build/
-__pycache__/
-*.py[cod]
-*$py.class
-
-# Distribution / packaging
-dist/
-build/
-*.egg-info/
-
-# Virtual environment
-venv/
-.venv/
-ENV/
-
-# IDE settings
-.vscode/
-.idea/
-
-# Compiled files
-*.spec
-!TaskMaster.spec
-
-# System files
-.DS_Store
-Thumbs.db
