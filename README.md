@@ -133,3 +133,18 @@ Never commit real credentials or API keys. Use the example files as templates:
 - Use `.gitignore` to exclude sensitive files
 - Regularly rotate service account keys
 - Monitor for unauthorized access
+
+## 🔒 Developer Setup
+
+1. Create a secure credentials folder outside the repository
+2. Set TASKMASTER_CREDENTIALS_PATH environment variable
+3. Copy your Firebase credentials to the secure folder
+4. Never commit or share your secure folder
+
+Example structure:
+```
+C:\Secure\TaskMaster\credentials\
+    ├── serviceAccountKey.json    # Real Firebase service account key
+    ├── firebase_config.json      # Real Firebase config
+    └── .env                      # Real environment variables
+```

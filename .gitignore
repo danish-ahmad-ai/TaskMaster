@@ -1,21 +1,31 @@
-# Environment variables
-.env
-
-# Firebase credentials and configs
+# Credentials and sensitive files
+credentials/
+*.key
 serviceAccountKey.json
 firebase_config.json
+.env
 
 # Example/template files are OK
-!serviceAccountKey.example.json
 !firebase_config.example.json
+!serviceAccountKey.example.json
 !.env.example
 
-# Other sensitive files
-*.key
-*.pem
-*.p12
-credentials/
-secrets/
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+
+# Build
+dist/
+build/
+*.egg-info/
 
 # Logs and local data
 *.log
@@ -46,4 +56,4 @@ ENV/
 
 # System files
 .DS_Store
-Thumbs.db 
+Thumbs.db
